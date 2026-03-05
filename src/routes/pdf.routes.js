@@ -28,4 +28,19 @@ router.post('/page-numbers', u, ctrl.addPageNumbers)
 router.post('/lock-pdf', u, ctrl.lock)
 router.post('/unlock-pdf', u, ctrl.unlock)
 
+// ─── New: Convert (Images) ────────────────────────────────────────────────────
+router.post('/pdf-to-png', u, ctrl.pdfToPng)
+router.post('/jpg-to-png', u, ctrl.jpgToPng)
+router.post('/png-to-jpg', u, ctrl.pngToJpg)
+
+// ─── New: Convert (Office) ────────────────────────────────────────────────────
+router.post('/pdf-to-ppt', u, ctrl.pdfToPpt)
+router.post('/ppt-to-pdf', u, ctrl.pptToPdf)
+router.post('/excel-to-pdf', u, ctrl.excelToPdf)
+router.post('/pdf-to-excel', u, ctrl.pdfToExcel)
+router.post('/pdf-to-text', u, ctrl.pdfToText)
+
+// ─── New: Edit ────────────────────────────────────────────────────────────────
+router.post('/crop-pdf', u, ctrl.cropPdf)
+
 module.exports = router

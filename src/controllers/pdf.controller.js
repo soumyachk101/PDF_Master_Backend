@@ -14,6 +14,17 @@ const pdfToJpgSvc = require('../services/pdfToJpg')
 const jpgToPdfSvc = require('../services/jpgToPdf')
 const pdfToWordSvc = require('../services/pdfToWord')
 const wordToPdfSvc = require('../services/wordToPdf')
+// --- New services ---
+const pdfToPngSvc = require('../services/pdfToPng')
+const jpgToPngSvc = require('../services/jpgToPng')
+const pngToJpgSvc = require('../services/pngToJpg')
+const pdfToPptSvc = require('../services/pdfToPpt')
+const pptToPdfSvc = require('../services/pptToPdf')
+const excelToPdfSvc = require('../services/excelToPdf')
+const pdfToExcelSvc = require('../services/pdfToExcel')
+const pdfToTextSvc = require('../services/pdfToText')
+const cropPdfSvc = require('../services/cropPdf')
+
 
 // ─── Helper: send file and cleanup ───────────────────────────────────────────
 function sendFile(res, buffer, filename, mime, uploadedPaths = []) {
@@ -229,6 +240,139 @@ exports.wordToPdf = async (req, res, next) => {
   try {
     const buf = await wordToPdfSvc(filePath)
     sendFile(res, buf, 'converted.pdf', 'application/pdf', [filePath])
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: PDF to PNG ──────────────────────────────────────────────────────────
+exports.pdfToPng = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  const dpi = parseInt(req.body.dpi || '150', 10)
+  try {
+    const buf = await pdfToPngSvc(filePath, dpi)
+    sendFile(res, buf, 'pdf-pages.zip', 'application/zip', [filePath])
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: JPG to PNG ──────────────────────────────────────────────────────────
+exports.jpgToPng = async (req, res, next) => {
+  if (!requireFiles(req, res, 1)) return
+  const paths = req.files.map(f => f.path)
+  try {
+    const buf = await jpgToPngSvc(paths)
+    sendFile(res, buf, 'converted-pngs.zip', 'application/zip', paths)
+  } catch (err) {
+    cleanupFiles(...paths)
+    next(err)
+  }
+}
+
+// ─── New: PNG to JPG ──────────────────────────────────────────────────────────
+exports.pngToJpg = async (req, res, next) => {
+  if (!requireFiles(req, res, 1)) return
+  const paths = req.files.map(f => f.path)
+  const quality = parseInt(req.body.quality || '90', 10)
+  try {
+    const buf = await pngToJpgSvc(paths, quality)
+    sendFile(res, buf, 'converted-jpgs.zip', 'application/zip', paths)
+  } catch (err) {
+    cleanupFiles(...paths)
+    next(err)
+  }
+}
+
+// ─── New: PDF to PPT ──────────────────────────────────────────────────────────
+exports.pdfToPpt = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  try {
+    const buf = await pdfToPptSvc(filePath)
+    sendFile(
+      res, buf, 'presentation.pptx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      [filePath]
+    )
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: PPT to PDF ──────────────────────────────────────────────────────────
+exports.pptToPdf = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  try {
+    const buf = await pptToPdfSvc(filePath)
+    sendFile(res, buf, 'converted.pdf', 'application/pdf', [filePath])
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: Excel to PDF ────────────────────────────────────────────────────────
+exports.excelToPdf = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  try {
+    const buf = await excelToPdfSvc(filePath)
+    sendFile(res, buf, 'spreadsheet.pdf', 'application/pdf', [filePath])
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: PDF to Excel ────────────────────────────────────────────────────────
+exports.pdfToExcel = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  try {
+    const buf = await pdfToExcelSvc(filePath)
+    sendFile(
+      res, buf, 'extracted.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      [filePath]
+    )
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: PDF to Text ─────────────────────────────────────────────────────────
+exports.pdfToText = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  try {
+    const buf = await pdfToTextSvc(filePath)
+    sendFile(res, buf, 'extracted-text.txt', 'text/plain', [filePath])
+  } catch (err) {
+    cleanupFiles(filePath)
+    next(err)
+  }
+}
+
+// ─── New: Crop PDF ────────────────────────────────────────────────────────────
+exports.cropPdf = async (req, res, next) => {
+  if (!requireFiles(req, res, 1, 1)) return
+  const filePath = req.files[0].path
+  const margins = {
+    top: parseInt(req.body.marginTop || '20', 10),
+    bottom: parseInt(req.body.marginBottom || '20', 10),
+    left: parseInt(req.body.marginLeft || '20', 10),
+    right: parseInt(req.body.marginRight || '20', 10),
+  }
+  try {
+    const buf = await cropPdfSvc(filePath, margins)
+    sendFile(res, buf, 'cropped.pdf', 'application/pdf', [filePath])
   } catch (err) {
     cleanupFiles(filePath)
     next(err)
