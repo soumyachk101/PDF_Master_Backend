@@ -26,7 +26,7 @@ app.use(helmet({
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
+  process.env.FRONTEND_URL || 'https://www.pdfkit.fun',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
 ]
@@ -63,7 +63,7 @@ app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to the PDFKit API',
     status: 'running',
-    docs: process.env.FRONTEND_URL || 'http://localhost:3000'
+    docs: process.env.FRONTEND_URL || 'https://www.pdfkit.fun'
   })
 })
 
