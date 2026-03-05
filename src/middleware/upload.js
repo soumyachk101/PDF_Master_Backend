@@ -22,10 +22,14 @@ const ALLOWED_TYPES = {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Ensure temp dir exists
-    if (!fs.existsSync(TEMP_DIR)) {
-      fs.mkdirSync(TEMP_DIR, { recursive: true })
+    try {
+      if (!fs.existsSync(TEMP_DIR)) {
+        fs.mkdirSync(TEMP_DIR, { recursive: true })
+      }
+      cb(null, TEMP_DIR)
+    } catch (err) {
+      cb(new Error('Failed to create temp directory: ' + err.message))
     }
-    cb(null, TEMP_DIR)
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()

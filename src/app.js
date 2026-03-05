@@ -15,8 +15,13 @@ const PORT = process.env.PORT || 4000
 
 // ─── Ensure temp directory exists ───────────────────────────────────────────
 const TEMP_DIR = path.join(__dirname, '../temp')
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR, { recursive: true })
+try {
+  if (!fs.existsSync(TEMP_DIR)) {
+    fs.mkdirSync(TEMP_DIR, { recursive: true })
+    console.log('[startup] Created temp directory')
+  }
+} catch (err) {
+  console.error('[startup] Failed to create temp directory:', err.message)
 }
 
 // ─── Security middleware ─────────────────────────────────────────────────────
@@ -31,16 +36,21 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
 ]
 
+// Log allowed origins for debugging
+console.log('[cors] Allowed origins:', allowedOrigins.filter(Boolean).join(', '))
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (server-to-server, Postman)
     if (!origin) return callback(null, true)
     if (allowedOrigins.includes(origin)) return callback(null, true)
+    console.warn('[cors] Blocked origin:', origin)
     callback(new Error(`CORS: origin ${origin} not allowed`))
   },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Content-Disposition', 'x-filename', 'x-filesize'],
+  credentials: false,
 }))
 
 // ─── Body parsing ────────────────────────────────────────────────────────────
@@ -123,13 +133,28 @@ cron.schedule('*/10 * * * *', cleanupTempFiles)
 cleanupTempFiles()
 
 // ─── Start server ────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`
+const port = parseInt(PORT, 10) || 4000
+
+// Add slight delay to ensure filesystem is ready (Railway-specific)
+const STARTUP_DELAY = process.env.RAILWAY ? 2000 : 500
+
+setTimeout(() => {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`
   ╔══════════════════════════════════╗
-  ║   PDFKit API — Running on :${PORT}  ║
+  ║   PDFKit API — Running on :${port}  ║
   ║   Environment: ${(process.env.NODE_ENV || 'development').padEnd(13)} ║
   ╚══════════════════════════════════╝
   `)
-})
+    
+    // Log environment info for debugging
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[startup] Production mode detected')
+      if (process.env.RAILWAY) {
+        console.log('[startup] Running on Railway platform')
+      }
+    }
+  })
+}, STARTUP_DELAY)
 
 module.exports = app
