@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["...", "libreoffice", "poppler_utils", "libutil"]
+
+[phases.build]
+cmds = ["npm install"]
+
+[start]
+cmd = "node src/app.js"
