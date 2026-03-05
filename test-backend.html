@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Master - Backend Connection Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1a1a2e; }
+        h2 { color: #666; font-size: 18px; margin-top: 0; }
+        .status { 
+            padding: 10px; 
+            border-radius: 4px; 
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #C84439;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        button:hover { background: #a83830; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-left: 3px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 PDF Master Backend Connection Test</h1>
+    <p>Use this tool to diagnose connection issues with your Railway backend.</p>
+
+    <div class="card">
+        <h2>1. Backend URL Configuration</h2>
+        <div class="input-group">
+            <label for="apiUrl">Backend API URL:</label>
+            <input type="text" id="apiUrl" value="https://web-production-f7439.up.railway.app" />
+            <p style="font-size: 12px; color: #666;">
+                This should match your VITE_API_URL in frontend/.env (without trailing slash)
+            </p>
+        </div>
+        <button onclick="testHealth()">Test Connection</button>
+        <div id="healthResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>2. CORS Test</h2>
+        <button onclick="testCORS()">Test CORS Headers</button>
+        <div id="corsResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>3. File Upload Test</h2>
+        <input type="file" id="testFile" accept=".pdf" />
+        <button onclick="testUpload()" style="margin-top: 10px;">Test PDF Upload</button>
+        <div id="uploadResult"></div>
+    </div>
+
+    <div class="card">
+        <h2>Console Output</h2>
+        <pre id="consoleOutput"></pre>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            output.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function showResult(elementId, success, message, details = null) {
+            const el = document.getElementById(elementId);
+            el.className = `test-result ${success ? 'success' : 'error'}`;
+            el.innerHTML = `<strong>${success ? '✓' : '✗'} ${message}</strong>`;
+            if (details) {
+                el.innerHTML += `<pre style="margin-top: 10px; background: white; padding: 10px;">${JSON.stringify(details, null, 2)}</pre>`;
+            }
+        }
+
+        async function testHealth() {
+            const baseUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const url = `${baseUrl}/health`;
+            
+            log(`Testing health endpoint: ${url}`);
+            const resultEl = 'healthResult';
+            
+            try {
+                const response = await fetch(url, { method: 'GET' });
+                log(`Response status: ${response.status} ${response.statusText}`);
+                
+                const data = await response.json();
+                log(`Response data: ${JSON.stringify(data)}`, 'success');
+                
+                if (data.status === 'ok') {
+                    showResult(resultEl, true, 'Backend is healthy!', data);
+                    log('Health check PASSED', 'success');
+                } else {
+                    showResult(resultEl, false, 'Backend responded but status is not OK', data);
+                    log('Health check FAILED - unexpected status', 'error');
+                }
+            } catch (error) {
+                log(`Health check FAILED: ${error.message}`, 'error');
+                showResult(resultEl, false, `Connection failed: ${error.message}`);
+                log('Possible causes: Wrong URL, backend not running, CORS blocked, network issue');
+            }
+        }
+
+        async function testCORS() {
+            const baseUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const url = `${baseUrl}/`;
+            
+            log(`Testing CORS from origin: ${window.location.origin}`);
+            const resultEl = 'corsResult';
+            
+            try {
+                const response = await fetch(url, { 
+                    method: 'GET',
+                    headers: { 'Origin': window.location.origin }
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                };
+                
+                log(`CORS headers: ${JSON.stringify(corsHeaders)}`, 'success');
+                showResult(resultEl, true, 'CORS headers received', corsHeaders);
+                
+                if (corsHeaders['Access-Control-Allow-Origin'] === '*' || 
+                    corsHeaders['Access-Control-Allow-Origin'] === window.location.origin) {
+                    log('CORS configuration looks CORRECT', 'success');
+                } else {
+                    log('WARNING: CORS may not be configured properly', 'error');
+                }
+            } catch (error) {
+                log(`CORS test FAILED: ${error.message}`, 'error');
+                showResult(resultEl, false, `CORS test failed: ${error.message}`);
+            }
+        }
+
+        async function testUpload() {
+            const fileInput = document.getElementById('testFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a PDF file first');
+                return;
+            }
+            
+            const baseUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            const url = `${baseUrl}/api/pdf/merge-pdf`;
+            
+            log(`Testing file upload to: ${url}`);
+            log(`File: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+            const resultEl = 'uploadResult';
+            
+            const formData = new FormData();
+            formData.append('files', file);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                log(`Upload response status: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    log(`Downloaded ${blob.size} bytes`, 'success');
+                    showResult(resultEl, true, 'Upload and processing successful!', {
+                        status: response.status,
+                        fileSize: blob.size,
+                        contentType: blob.type
+                    });
+                } else {
+                    const errorText = await response.text();
+                    log(`Server error: ${errorText}`, 'error');
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        showResult(resultEl, false, `Server error: ${response.status}`, errorJson);
+                    } catch {
+                        showResult(resultEl, false, `Server error: ${errorText}`);
+                    }
+                }
+            } catch (error) {
+                log(`Upload FAILED: ${error.message}`, 'error');
+                showResult(resultEl, false, `Upload failed: ${error.message}`);
+                if (error.message.includes('Failed to fetch')) {
+                    log('This is likely a CORS or network connectivity issue', 'error');
+                }
+            }
+        }
+
+        // Auto-run health check on load
+        window.addEventListener('load', () => {
+            log('Page loaded. Run tests using the buttons above.');
+            setTimeout(testHealth, 500);
+        });
+    </script>
+</body>
+</html>

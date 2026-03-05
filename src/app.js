@@ -43,6 +43,12 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (server-to-server, Postman)
     if (!origin) return callback(null, true)
+    
+    // Allow all origins in development or if explicitly enabled
+    if (process.env.NODE_ENV === 'development' || process.env.ALLOW_ALL_CORS === 'true') {
+      return callback(null, true)
+    }
+    
     if (allowedOrigins.includes(origin)) return callback(null, true)
     console.warn('[cors] Blocked origin:', origin)
     callback(new Error(`CORS: origin ${origin} not allowed`))
