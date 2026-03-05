@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["...", "libreoffice", "poppler_utils", "libutil", "ghostscript"]
-
-[phases.build]
-cmds = ["npm install --legacy-peer-deps"]
-
-[start]
-cmd = "node src/app.js"
