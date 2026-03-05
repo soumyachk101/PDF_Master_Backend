@@ -16,45 +16,56 @@ module.exports = async function wordToPdf(filePath) {
   const { TEMP_DIR } = require('../config/paths')
 
   try {
-    // Try LibreOffice headless conversion
-    const { exec } = require('child_process')
-    const { promisify } = require('util')
-    const execAsync = promisify(exec)
+    // Try LibreOffice headless conversion (only if not on Vercel)
+    if (!process.env.VERCEL) {
+      const { exec } = require('child_process')
+      const { promisify } = require('util')
+      const execAsync = promisify(exec)
 
-    await execAsync(
-      `libreoffice --headless --convert-to pdf --outdir "${TEMP_DIR}" "${filePath}"`,
-      { timeout: 60000 }
-    )
+      await execAsync(
+        `libreoffice --headless --convert-to pdf --outdir "${TEMP_DIR}" "${filePath}"`,
+        { timeout: 60000 }
+      )
 
-    // Find the generated PDF
-    const baseName = path.basename(filePath, path.extname(filePath))
-    const outputPath = path.join(TEMP_DIR, `${baseName}.pdf`)
+      const baseName = path.basename(filePath, path.extname(filePath))
+      const outputPath = path.join(TEMP_DIR, `${baseName}.pdf`)
 
-    if (!fs.existsSync(outputPath)) {
-      throw new Error('LibreOffice did not produce a PDF output.')
-    }
-
-    const buffer = fs.readFileSync(outputPath)
-    // Cleanup the intermediate PDF
-    try { fs.unlinkSync(outputPath) } catch { }
-    return buffer
-  } catch (err) {
-    if (err.message.includes('libreoffice') || err.message.includes('not found')) {
-      // Fallback: Try libreoffice-convert npm package
-      try {
-        const libreConvert = require('libreoffice-convert')
-        const { promisify } = require('util')
-        const convertAsync = promisify(libreConvert.convert)
-        const docBytes = fs.readFileSync(filePath)
-        const pdfBytes = await convertAsync(docBytes, '.pdf', undefined)
-        return Buffer.from(pdfBytes)
-      } catch (e2) {
-        throw new Error(
-          'Word to PDF conversion requires LibreOffice. ' +
-          'Install with: apt-get install libreoffice'
-        )
+      if (fs.existsSync(outputPath)) {
+        const buffer = fs.readFileSync(outputPath)
+        try { fs.unlinkSync(outputPath) } catch { }
+        return buffer
       }
     }
-    throw err
+
+    // Fallback: Use ConvertAPI if VERCEL or LibreOffice fails
+    if (process.env.CONVERT_API_SECRET) {
+      console.log('[wordToPdf] Using ConvertAPI fallback')
+      const axios = require('axios')
+      const formData = new (require('form-data'))()
+      formData.append('File', fs.createReadStream(filePath))
+
+      const response = await axios.post(
+        `https://v2.convertapi.com/convert/doc/to/pdf?Secret=${process.env.CONVERT_API_SECRET}`,
+        formData,
+        {
+          headers: formData.getHeaders(),
+          responseType: 'arraybuffer'
+        }
+      )
+      return Buffer.from(response.data)
+    }
+
+    // Last resort fallback: Try libreoffice-convert npm package
+    const libreConvert = require('libreoffice-convert')
+    const { promisify } = require('util')
+    const convertAsync = promisify(libreConvert.convert)
+    const docBytes = fs.readFileSync(filePath)
+    const pdfBytes = await convertAsync(docBytes, '.pdf', undefined)
+    return Buffer.from(pdfBytes)
+  } catch (err) {
+    console.error('[wordToPdf] Error:', err.message)
+    throw new Error(
+      'Word to PDF conversion failed. On Vercel, please provide CONVERT_API_SECRET.'
+    )
   }
 }

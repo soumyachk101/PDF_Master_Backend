@@ -6,7 +6,6 @@ const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 const path = require('path')
 const fs = require('fs')
-const cron = require('node-cron')
 const pdfRoutes = require('./routes/pdf.routes')
 const errorHandler = require('./middleware/errorHandler')
 const { TEMP_DIR } = require('./config/paths')
@@ -98,42 +97,9 @@ app.use((req, res) => {
 // ─── Error handler ───────────────────────────────────────────────────────────
 app.use(errorHandler)
 
-// ─── Auto-cleanup: delete temp files older than TTL ──────────────────────────
-const TTL_MINUTES = parseInt(process.env.TEMP_FILE_TTL_MINUTES || '30', 10)
-
-function cleanupTempFiles() {
-  try {
-    const files = fs.readdirSync(TEMP_DIR)
-    const now = Date.now()
-    let deleted = 0
-
-    files.forEach(file => {
-      if (file === '.gitkeep') return
-      const filePath = path.join(TEMP_DIR, file)
-      try {
-        const stat = fs.statSync(filePath)
-        const ageMinutes = (now - stat.mtimeMs) / 1000 / 60
-        if (ageMinutes > TTL_MINUTES) {
-          fs.unlinkSync(filePath)
-          deleted++
-        }
-      } catch { /* file already deleted */ }
-    })
-
-    if (deleted > 0) {
-      console.log(`[cleanup] Deleted ${deleted} old temp file(s)`)
-    }
-  } catch (err) {
-    console.error('[cleanup] Error:', err.message)
-  }
-}
-
-// Run cleanup every 10 minutes
-cron.schedule('*/10 * * * *', cleanupTempFiles)
-// Also run once at startup
-cleanupTempFiles()
-
 // ─── Start server (only if not running on Vercel) ────────────────────────────
+// Note: On Vercel, the app is exported and handled by the platform.
+// Background cleanup is removed for serverless compatibility.
 if (!process.env.VERCEL) {
   const port = parseInt(PORT, 10) || 4000
   const STARTUP_DELAY = process.env.RAILWAY ? 2000 : 500
