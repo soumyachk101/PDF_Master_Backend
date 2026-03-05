@@ -44,6 +44,10 @@ app.use(cors({
     }
 
     if (allowedOrigins.includes(origin)) return callback(null, true)
+
+    // Allow Vercel preview domains dynamically
+    if (origin.endsWith('.vercel.app')) return callback(null, true)
+
     console.warn('[cors] Blocked origin:', origin)
     callback(new Error(`CORS: origin ${origin} not allowed`))
   },
