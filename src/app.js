@@ -30,8 +30,11 @@ app.use(helmet({
 }))
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
+const rawFrontendUrl = process.env.FRONTEND_URL || 'https://www.pdfkit.fun'
+const cleanFrontendUrl = rawFrontendUrl.replace(/\/+$/, '')
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'https://www.pdfkit.fun',
+  cleanFrontendUrl,
   'http://localhost:3000',
   'http://127.0.0.1:3000',
 ]
@@ -43,12 +46,12 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (server-to-server, Postman)
     if (!origin) return callback(null, true)
-    
+
     // Allow all origins in development or if explicitly enabled
     if (process.env.NODE_ENV === 'development' || process.env.ALLOW_ALL_CORS === 'true') {
       return callback(null, true)
     }
-    
+
     if (allowedOrigins.includes(origin)) return callback(null, true)
     console.warn('[cors] Blocked origin:', origin)
     callback(new Error(`CORS: origin ${origin} not allowed`))
@@ -79,7 +82,7 @@ app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to the PDFKit API',
     status: 'running',
-    docs: process.env.FRONTEND_URL || 'https://www.pdfkit.fun'
+    docs: cleanFrontendUrl
   })
 })
 
@@ -152,7 +155,7 @@ setTimeout(() => {
   ║   Environment: ${(process.env.NODE_ENV || 'development').padEnd(13)} ║
   ╚══════════════════════════════════╝
   `)
-    
+
     // Log environment info for debugging
     if (process.env.NODE_ENV === 'production') {
       console.log('[startup] Production mode detected')
