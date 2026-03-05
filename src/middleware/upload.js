@@ -3,7 +3,7 @@ const path = require('path')
 const { v4: uuid } = require('uuid')
 const fs = require('fs')
 
-const TEMP_DIR = path.join(__dirname, '../../temp')
+const { TEMP_DIR } = require('../config/paths')
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE_MB || '100', 10) * 1024 * 1024
 
 // Allowed MIME types per file extension

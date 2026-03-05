@@ -13,7 +13,7 @@ const { v4: uuid } = require('uuid')
  * @returns {Promise<Buffer>} PDF as Buffer
  */
 module.exports = async function wordToPdf(filePath) {
-  const TEMP_DIR = path.join(__dirname, '../../temp')
+  const { TEMP_DIR } = require('../config/paths')
 
   try {
     // Try LibreOffice headless conversion
@@ -36,7 +36,7 @@ module.exports = async function wordToPdf(filePath) {
 
     const buffer = fs.readFileSync(outputPath)
     // Cleanup the intermediate PDF
-    try { fs.unlinkSync(outputPath) } catch {}
+    try { fs.unlinkSync(outputPath) } catch { }
     return buffer
   } catch (err) {
     if (err.message.includes('libreoffice') || err.message.includes('not found')) {

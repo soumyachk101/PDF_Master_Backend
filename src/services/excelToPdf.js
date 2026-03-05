@@ -5,7 +5,7 @@ const { promisify } = require('util')
 const { v4: uuid } = require('uuid')
 
 const execAsync = promisify(exec)
-const TEMP_DIR = path.join(__dirname, '../../temp')
+const { TEMP_DIR } = require('../config/paths')
 
 /**
  * Convert an Excel (.xlsx/.xls) file to PDF using LibreOffice.

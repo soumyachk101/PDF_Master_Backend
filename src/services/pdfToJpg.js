@@ -6,7 +6,7 @@ const JSZip = require('jszip')
 const { v4: uuid } = require('uuid')
 
 const execAsync = promisify(exec)
-const TEMP_DIR = path.join(__dirname, '../../temp')
+const { TEMP_DIR } = require('../config/paths')
 
 /**
  * Convert each page of a PDF to a JPG image.
@@ -63,7 +63,7 @@ module.exports = async function pdfToJpg(filePath, dpi = 150) {
     const dir = TEMP_DIR
     fs.readdirSync(dir)
       .filter(f => f.startsWith(`jpg_${jobId}`))
-      .forEach(f => { try { fs.unlinkSync(path.join(dir, f)) } catch {} })
+      .forEach(f => { try { fs.unlinkSync(path.join(dir, f)) } catch { } })
 
     if (err.message.includes('pdftoppm')) {
       throw new Error(

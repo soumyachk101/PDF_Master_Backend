@@ -8,7 +8,7 @@ const PptxGenJS = require('pptxgenjs')
 const JSZip = require('jszip')
 
 const execAsync = promisify(exec)
-const TEMP_DIR = path.join(__dirname, '../../temp')
+const { TEMP_DIR } = require('../config/paths')
 
 /**
  * Convert a PDF to a PPTX file.
