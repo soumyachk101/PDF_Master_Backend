@@ -4,7 +4,9 @@ const uuid = require('uuid');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '../../uploads')); // Assuming an uploads folder exists
+        // /tmp is the only writable directory in Vercel serverless and local
+        const os = require('os');
+        cb(null, os.tmpdir());
     },
     filename: (req, file, cb) => {
         cb(null, `${uuid.v4()}-${file.originalname}`);
