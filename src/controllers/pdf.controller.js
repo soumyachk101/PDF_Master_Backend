@@ -112,3 +112,85 @@ exports.ocrPdf = async (req, res, next) => {
         res.send(textBuffer);
     } catch (error) { next(error); }
 };
+
+// --- CONVERT TO PDF ---
+
+exports.jpgToPdf = async (req, res, next) => {
+    try {
+        if (!req.files || req.files.length === 0) return res.status(400).json({ error: { message: 'Please upload JPG/PNG images.' } });
+        const filePaths = req.files.map(f => f.path);
+        const pdfBuffer = await pdfService.jpgToPdf(filePaths);
+        filePaths.forEach(fp => {
+            try { fs.unlinkSync(fp); } catch (e) { }
+        });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-images.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.wordToPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a Word Document.' } });
+        const pdfBuffer = await pdfService.wordToPdf(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-word.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.powerpointToPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PowerPoint Document.' } });
+        const pdfBuffer = await pdfService.powerpointToPdf(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-presentation.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+// --- CONVERT FROM PDF ---
+
+exports.pdfToJpg = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const resultBuffer = await pdfService.pdfToJpg(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+
+        // If it's a zip (multiple pages), it has a magic number signature 'PK' (50 4B)
+        const isZip = resultBuffer[0] === 0x50 && resultBuffer[1] === 0x4B;
+
+        if (isZip) {
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', 'attachment; filename="converted-images.zip"');
+        } else {
+            res.setHeader('Content-Type', 'image/jpeg');
+            res.setHeader('Content-Disposition', 'attachment; filename="converted-image.jpg"');
+        }
+        res.send(resultBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.pdfToWord = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const docxBuffer = await pdfService.pdfToWord(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-word.docx"');
+        res.send(docxBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.pdfToExcel = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const xlsxBuffer = await pdfService.pdfToExcel(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-excel.xlsx"');
+        res.send(xlsxBuffer);
+    } catch (error) { next(error); }
+};

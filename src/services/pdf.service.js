@@ -172,3 +172,52 @@ exports.ocrPdf = async (filePath) => {
     // Basic MVP: return early, full Tesseract logic requires image conversion first
     throw new Error('OCR functionality coming soon.');
 };
+// Convert TO PDF section
+const sharp = require('sharp');
+const libre = require('libreoffice-convert');
+const libreConvert = util.promisify(libre.convert);
+
+exports.jpgToPdf = async (filePaths) => {
+    // Convert multiple JPGs into one PDF or just a single JPG
+    const newPdf = await PDFDocument.create();
+
+    for (const imgPath of filePaths) {
+        // use sharp to ensure it's a valid jpeg/png buffer before embedding
+        const imgBuffer = await sharp(imgPath).jpeg().toBuffer();
+        const image = await newPdf.embedJpg(imgBuffer);
+
+        const page = newPdf.addPage([image.width, image.height]);
+        page.drawImage(image, {
+            x: 0,
+            y: 0,
+            width: image.width,
+            height: image.height,
+        });
+    }
+
+    const newPdfBytes = await newPdf.save();
+    return Buffer.from(newPdfBytes);
+};
+
+exports.wordToPdf = async (filePath) => {
+    // LibreOffice-convert requires libreoffice to be installed on the host ENV
+    const fileContent = await fs.readFile(filePath);
+    try {
+        const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
+        return pdfBuffer;
+    } catch (e) {
+        console.error("LibreOffice convert error:", e);
+        throw new Error("Failed to convert Word to PDF. Make sure LibreOffice is installed.");
+    }
+};
+
+exports.powerpointToPdf = async (filePath) => {
+    // PPT uses the exact same libreoffice convert pipeline as Word
+    const fileContent = await fs.readFile(filePath);
+    try {
+        const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
+        return pdfBuffer;
+    } catch (e) {
+        throw new Error("Failed to convert Powerpoint to PDF. Make sure LibreOffice is installed.");
+    }
+};
