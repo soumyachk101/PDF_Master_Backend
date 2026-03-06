@@ -298,3 +298,114 @@ exports.signPdf = async (filePath, signatureText) => {
     const signedBytes = await pdfDoc.save();
     return Buffer.from(signedBytes);
 };
+
+// --- ORGANIZE (MISC) ---
+
+exports.rotatePdf = async (filePath, degrees) => {
+    // Rotates all pages by X degrees
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const pages = pdfDoc.getPages();
+
+    // PDF-lib rotate accepts 'degrees' object which is a number multiple of 90
+    for (const page of pages) {
+        page.setRotation(require('pdf-lib').degrees(parseInt(degrees) || 90));
+    }
+
+    const rotatedBytes = await pdfDoc.save();
+    return Buffer.from(rotatedBytes);
+};
+
+exports.addPageNumbers = async (filePath) => {
+    // Automatically appends 'Page X of Y' to the bottom right of each page
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
+
+    for (let i = 0; i < totalPages; i++) {
+        const page = pages[i];
+        const { width, height } = page.getSize();
+        page.drawText(`Page ${i + 1} of ${totalPages}`, {
+            x: width - 80,
+            y: 20,
+            size: 10,
+        });
+    }
+
+    const numberedBytes = await pdfDoc.save();
+    return Buffer.from(numberedBytes);
+};
+
+// --- ADDITIONAL TOOLS FOR 30-TOOL PARITY ---
+
+exports.excelToPdf = async (filePath) => {
+    const fileContent = await fs.readFile(filePath);
+    try {
+        const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
+        return pdfBuffer;
+    } catch (e) {
+        throw new Error("Failed to convert Excel to PDF.");
+    }
+};
+
+const puppeteer = require('puppeteer');
+exports.htmlToPdf = async (url) => {
+    // Uses Puppeteer to load URL and print to PDF
+    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+    await browser.close();
+    return pdfBuffer;
+};
+
+exports.pdfToPptx = async (filePath) => {
+    const fileContent = await fs.readFile(filePath);
+    try {
+        const pptxBuffer = await libreConvert(fileContent, '.pptx', undefined);
+        return pptxBuffer;
+    } catch (e) {
+        throw new Error("Failed to convert PDF to PowerPoint.");
+    }
+};
+
+exports.pdfToPdfa = async (filePath) => {
+    // True PDF/A requires ghostscript with specific color profiles.
+    // MVP uses GS PDFSETTINGS
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-pdfa.pdf`);
+    try {
+        const command = `gs -dPDFA -dBATCH -dNOPAUSE -sProcessColorModel=DeviceRGB -sDEVICE=pdfwrite -sPDFACompatibilityPolicy=1 -sOutputFile="${tempOutputFile}" "${filePath}"`;
+        await execPromise(command);
+        const pdfaBuffer = await fs.readFile(tempOutputFile);
+        return Buffer.from(pdfaBuffer);
+    } catch (e) {
+        throw new Error("Failed to convert to PDF/A.");
+    } finally {
+        try { await fs.unlink(tempOutputFile); } catch (e) { }
+    }
+};
+
+exports.removePages = async (filePath, pagesToRemoveString) => {
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const totalPages = pdfDoc.getPageCount();
+
+    // Parse logic like '1,3,5'
+    let toRemove = [];
+    if (pagesToRemoveString) {
+        toRemove = pagesToRemoveString.split(',').map(Number).map(n => n - 1);
+    }
+
+    // PDF-lib requires removing from the end to the beginning so indices don't shift
+    toRemove = [...new Set(toRemove)].sort((a, b) => b - a);
+
+    for (const index of toRemove) {
+        if (index >= 0 && index < totalPages) {
+            pdfDoc.removePage(index);
+        }
+    }
+
+    const modifiedBytes = await pdfDoc.save();
+    return Buffer.from(modifiedBytes);
+};

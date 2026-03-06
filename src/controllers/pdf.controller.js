@@ -246,3 +246,86 @@ exports.signPdf = async (req, res, next) => {
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
+
+// --- ADDITIONAL TOOLS CONTROLLERS ---
+
+exports.excelToPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload an Excel file.' } });
+        const pdfBuffer = await pdfService.excelToPdf(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-excel.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.htmlToPdf = async (req, res, next) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: { message: 'Please provide a valid URL.' } });
+        const pdfBuffer = await pdfService.htmlToPdf(url);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="webpage.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.pdfToPptx = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const pptxBuffer = await pdfService.pdfToPptx(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted.pptx"');
+        res.send(pptxBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.pdfToPdfa = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const pdfaBuffer = await pdfService.pdfToPdfa(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="archive.pdf"');
+        res.send(pdfaBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.removePages = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { pages } = req.body; // e.g., '1,3,5'
+        const pdfBuffer = await pdfService.removePages(req.file.path, pages);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="pages-removed.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+// --- ORGANIZE (MISC) ---
+
+exports.rotatePdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { degrees } = req.body;
+        const pdfBuffer = await pdfService.rotatePdf(req.file.path, degrees);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="rotated.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.addPageNumbers = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const pdfBuffer = await pdfService.addPageNumbers(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="numbered.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
