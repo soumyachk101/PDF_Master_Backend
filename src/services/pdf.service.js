@@ -143,26 +143,43 @@ exports.jpgToPdf = async (filePaths) => {
 
 exports.wordToPdf = async (filePath) => {
     const libre = require('libreoffice-convert');
-    const libreConvert = util.promisify(libre.convert);
+    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
     const fileContent = await fs.readFile(filePath);
     try {
-        const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
+        const options = {
+            sofficeBinaryPaths: [
+                '/run/current-system/sw/bin/soffice',
+                '/run/current-system/sw/bin/libreoffice',
+                '/usr/bin/soffice',
+                '/usr/bin/libreoffice'
+            ]
+        };
+        const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;
     } catch (e) {
         console.error('LibreOffice convert error:', e);
-        throw new Error('Failed to convert Word to PDF. Make sure LibreOffice is installed.');
+        throw new Error(`Failed to convert Word to PDF. If deployed, LibreOffice path may be missing. Error: ${e.message}`);
     }
 };
 
 exports.powerpointToPdf = async (filePath) => {
     const libre = require('libreoffice-convert');
-    const libreConvert = util.promisify(libre.convert);
+    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
     const fileContent = await fs.readFile(filePath);
     try {
-        const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
+        const options = {
+            sofficeBinaryPaths: [
+                '/run/current-system/sw/bin/soffice',
+                '/run/current-system/sw/bin/libreoffice',
+                '/usr/bin/soffice',
+                '/usr/bin/libreoffice'
+            ]
+        };
+        const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;
     } catch (e) {
-        throw new Error('Failed to convert Powerpoint to PDF. Make sure LibreOffice is installed.');
+        console.error('LibreOffice convert error:', e);
+        throw new Error(`Failed to convert Powerpoint to PDF. If deployed, LibreOffice path may be missing. Error: ${e.message}`);
     }
 };
 
