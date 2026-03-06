@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["ghostscript", "qpdf", "chromium", "libreoffice"]
+nixPkgs = ["nodejs_20", "ghostscript", "qpdf", "chromium", "libreoffice"]
 
-[variables]
-MAX_FILE_SIZE_MB = "100"
+[phases.build]
+cmds = ["npm ci --omit=dev"]
 
 [start]
 cmd = "node src/app.js"
