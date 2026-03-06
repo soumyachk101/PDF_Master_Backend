@@ -108,3 +108,67 @@ exports.extractPdf = async (filePath, ranges) => {
     const newPdfBytes = await newPdf.save();
     return Buffer.from(newPdfBytes);
 };
+
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+const path = require('path');
+const os = require('os');
+const { v4: uuidv4 } = require('uuid');
+
+exports.compressPdf = async (filePath) => {
+    // We use Ghostscript to optimize the PDF by shrinking images and restructuring
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-compressed.pdf`);
+
+    try {
+        const command = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`;
+        await execPromise(command);
+
+        const compressedBuffer = await fs.readFile(tempOutputFile);
+        return Buffer.from(compressedBuffer);
+    } catch (error) {
+        console.error('Compression error:', error);
+        throw new Error('Failed to compress PDF. Internal Error.');
+    } finally {
+        try {
+            await fs.unlink(tempOutputFile);
+        } catch (e) { }
+    }
+};
+
+exports.repairPdf = async (filePath) => {
+    // Repairing through Ghostscript ignores broken XREFs and streams
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-repaired.pdf`);
+
+    try {
+        const command = `gs -o "${tempOutputFile}" -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress "${filePath}"`;
+        await execPromise(command);
+
+        const repairedBuffer = await fs.readFile(tempOutputFile);
+        return Buffer.from(repairedBuffer);
+    } catch (error) {
+        console.error('Repair error:', error);
+        throw new Error('Failed to repair PDF. It might be too heavily corrupted.');
+    } finally {
+        try {
+            await fs.unlink(tempOutputFile);
+        } catch (e) { }
+    }
+};
+
+exports.flattenPdf = async (filePath) => {
+    // Flatten form fields into standard page content
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const form = pdfDoc.getForm();
+    form.flatten();
+
+    const flattenedBytes = await pdfDoc.save();
+    return Buffer.from(flattenedBytes);
+};
+
+// OCR logic will require Tesseract / poppler. For MVP, we can mock or do basic extraction
+exports.ocrPdf = async (filePath) => {
+    // Basic MVP: return early, full Tesseract logic requires image conversion first
+    throw new Error('OCR functionality coming soon.');
+};
