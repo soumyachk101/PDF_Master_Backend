@@ -221,3 +221,80 @@ exports.powerpointToPdf = async (filePath) => {
         throw new Error("Failed to convert Powerpoint to PDF. Make sure LibreOffice is installed.");
     }
 };
+// --- SECURITY ---
+const qpdf = require('node-qpdf2');
+
+exports.unlockPdf = async (filePath, password) => {
+    // We use qpdf to decrypt. If no password config is passed, it attempts to remove restrictions.
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-unlocked.pdf`);
+    try {
+        const options = {
+            keyLength: 256,
+            password: password || ''
+        };
+        await qpdf.decrypt(filePath, tempOutputFile, options);
+        const unlockedBuffer = await fs.readFile(tempOutputFile);
+        return Buffer.from(unlockedBuffer);
+    } catch (e) {
+        console.error("Unlock error:", e);
+        throw new Error("Failed to unlock PDF. Invalid password or corrupted file.");
+    } finally {
+        try { await fs.unlink(tempOutputFile); } catch (e) { }
+    }
+};
+
+exports.protectPdf = async (filePath, password) => {
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-protected.pdf`);
+    try {
+        const options = {
+            keyLength: 256,
+            password: password
+        };
+        await qpdf.encrypt(filePath, options, tempOutputFile);
+        const protectedBuffer = await fs.readFile(tempOutputFile);
+        return Buffer.from(protectedBuffer);
+    } catch (e) {
+        console.error("Protect error:", e);
+        throw new Error("Failed to protect PDF.");
+    } finally {
+        try { await fs.unlink(tempOutputFile); } catch (e) { }
+    }
+};
+
+exports.watermarkPdf = async (filePath, text) => {
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const pages = pdfDoc.getPages();
+
+    for (const page of pages) {
+        const { width, height } = page.getSize();
+        page.drawText(text || 'CONFIDENTIAL', {
+            x: width / 4,
+            y: height / 2,
+            size: 50,
+            opacity: 0.3,
+            rotate: require('pdf-lib').degrees(45),
+        });
+    }
+
+    const watermarkedBytes = await pdfDoc.save();
+    return Buffer.from(watermarkedBytes);
+};
+
+exports.signPdf = async (filePath, signatureText) => {
+    // MVP: visual signature placement. 
+    // Real cryptographically valid digital signatures require a .p12 cert file
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0];
+
+    firstPage.drawText(`Digitally Signed: ${signatureText || 'Verified User'}`, {
+        x: 50,
+        y: 50,
+        size: 15,
+    });
+
+    const signedBytes = await pdfDoc.save();
+    return Buffer.from(signedBytes);
+};

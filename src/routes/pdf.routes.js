@@ -29,5 +29,11 @@ router.post('/pdf-to-jpg', upload.single('files'), pdfController.pdfToJpg);
 router.post('/pdf-to-word', upload.single('files'), pdfController.pdfToWord);
 router.post('/pdf-to-excel', upload.single('files'), pdfController.pdfToExcel);
 
+// Security
+router.post('/unlock-pdf', upload.single('files'), pdfController.unlockPdf);
+router.post('/protect-pdf', upload.single('files'), pdfController.protectPdf);
+router.post('/watermark-pdf', upload.single('files'), pdfController.watermarkPdf);
+router.post('/sign-pdf', upload.single('files'), pdfController.signPdf);
+
 // Placeholder for the rest of the remaining routes...
 module.exports = router;

@@ -194,3 +194,55 @@ exports.pdfToExcel = async (req, res, next) => {
         res.send(xlsxBuffer);
     } catch (error) { next(error); }
 };
+
+// --- SECURITY ---
+
+exports.unlockPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { password } = req.body;
+        const pdfBuffer = await pdfService.unlockPdf(req.file.path, password);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="unlocked.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.protectPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { password } = req.body;
+        if (!password) return res.status(400).json({ error: { message: 'Password is required to protect the PDF.' } });
+
+        const pdfBuffer = await pdfService.protectPdf(req.file.path, password);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="protected.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.watermarkPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { text } = req.body;
+        const pdfBuffer = await pdfService.watermarkPdf(req.file.path, text);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="watermarked.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
+
+exports.signPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { text } = req.body;
+        const pdfBuffer = await pdfService.signPdf(req.file.path, text);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="signed.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) { next(error); }
+};
