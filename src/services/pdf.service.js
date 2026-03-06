@@ -173,12 +173,10 @@ exports.ocrPdf = async (filePath) => {
     throw new Error('OCR functionality coming soon.');
 };
 // Convert TO PDF section
-const sharp = require('sharp');
-const libre = require('libreoffice-convert');
-const libreConvert = util.promisify(libre.convert);
 
 exports.jpgToPdf = async (filePaths) => {
     // Convert multiple JPGs into one PDF or just a single JPG
+    const sharp = require('sharp');
     const newPdf = await PDFDocument.create();
 
     for (const imgPath of filePaths) {
@@ -201,6 +199,8 @@ exports.jpgToPdf = async (filePaths) => {
 
 exports.wordToPdf = async (filePath) => {
     // LibreOffice-convert requires libreoffice to be installed on the host ENV
+    const libre = require('libreoffice-convert');
+    const libreConvert = util.promisify(libre.convert);
     const fileContent = await fs.readFile(filePath);
     try {
         const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
@@ -212,7 +212,8 @@ exports.wordToPdf = async (filePath) => {
 };
 
 exports.powerpointToPdf = async (filePath) => {
-    // PPT uses the exact same libreoffice convert pipeline as Word
+    const libre = require('libreoffice-convert');
+    const libreConvert = util.promisify(libre.convert);
     const fileContent = await fs.readFile(filePath);
     try {
         const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
@@ -222,10 +223,10 @@ exports.powerpointToPdf = async (filePath) => {
     }
 };
 // --- SECURITY ---
-const qpdf = require('node-qpdf2');
 
 exports.unlockPdf = async (filePath, password) => {
-    // We use qpdf to decrypt. If no password config is passed, it attempts to remove restrictions.
+    const qpdf = require('node-qpdf2');
+    // We use qpdf to decrypt.
     const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-unlocked.pdf`);
     try {
         const options = {
@@ -244,6 +245,7 @@ exports.unlockPdf = async (filePath, password) => {
 };
 
 exports.protectPdf = async (filePath, password) => {
+    const qpdf = require('node-qpdf2');
     const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-protected.pdf`);
     try {
         const options = {
@@ -340,6 +342,8 @@ exports.addPageNumbers = async (filePath) => {
 // --- ADDITIONAL TOOLS FOR 30-TOOL PARITY ---
 
 exports.excelToPdf = async (filePath) => {
+    const libre = require('libreoffice-convert');
+    const libreConvert = util.promisify(libre.convert);
     const fileContent = await fs.readFile(filePath);
     try {
         const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
@@ -349,8 +353,8 @@ exports.excelToPdf = async (filePath) => {
     }
 };
 
-const puppeteer = require('puppeteer');
 exports.htmlToPdf = async (url) => {
+    const puppeteer = require('puppeteer');
     // Uses Puppeteer to load URL and print to PDF
     const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();
@@ -361,6 +365,8 @@ exports.htmlToPdf = async (url) => {
 };
 
 exports.pdfToPptx = async (filePath) => {
+    const libre = require('libreoffice-convert');
+    const libreConvert = util.promisify(libre.convert);
     const fileContent = await fs.readFile(filePath);
     try {
         const pptxBuffer = await libreConvert(fileContent, '.pptx', undefined);
