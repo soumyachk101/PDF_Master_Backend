@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     libreoffice \
     ghostscript \
     qpdf \
+    chromium \
     fonts-liberation \
     fonts-noto \
     --no-install-recommends && \
@@ -33,9 +34,9 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-# Puppeteer: skip bundled Chromium download (too large for Docker layers)
-# We use the system-installed Chromium if available, otherwise puppeteer-core
+# Puppeteer: skip bundled Chromium, use system-installed one
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 EXPOSE 4000
 CMD ["node", "src/app.js"]

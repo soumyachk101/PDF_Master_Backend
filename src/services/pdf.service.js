@@ -355,10 +355,18 @@ exports.excelToPdf = async (filePath) => {
 
 exports.htmlToPdf = async (url) => {
     const puppeteer = require('puppeteer');
-    // Uses Puppeteer to load URL and print to PDF
-    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+    // Uses Puppeteer to load URL and print to PDF.
+    // PUPPETEER_EXECUTABLE_PATH env var points to system Chromium (NixOS, Railway, etc.)
+    const launchOptions = {
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    };
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle0' });
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
     const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
     await browser.close();
     return pdfBuffer;
