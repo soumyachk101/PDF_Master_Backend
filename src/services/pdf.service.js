@@ -144,15 +144,24 @@ exports.jpgToPdf = async (filePaths) => {
 exports.wordToPdf = async (filePath) => {
     const libre = require('libreoffice-convert');
     const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
+    const { execSync } = require('child_process');
     const fileContent = await fs.readFile(filePath);
     try {
+        let dynamicSofficePath = '';
+        try {
+            dynamicSofficePath = execSync('which soffice').toString().trim();
+        } catch (err) {
+            console.error('Could not find soffice via which command', err);
+        }
+
         const options = {
             sofficeBinaryPaths: [
+                dynamicSofficePath,
                 '/run/current-system/sw/bin/soffice',
                 '/run/current-system/sw/bin/libreoffice',
                 '/usr/bin/soffice',
                 '/usr/bin/libreoffice'
-            ]
+            ].filter(Boolean)
         };
         const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;
@@ -165,15 +174,24 @@ exports.wordToPdf = async (filePath) => {
 exports.powerpointToPdf = async (filePath) => {
     const libre = require('libreoffice-convert');
     const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
+    const { execSync } = require('child_process');
     const fileContent = await fs.readFile(filePath);
     try {
+        let dynamicSofficePath = '';
+        try {
+            dynamicSofficePath = execSync('which soffice').toString().trim();
+        } catch (err) {
+            console.error('Could not find soffice via which command', err);
+        }
+
         const options = {
             sofficeBinaryPaths: [
+                dynamicSofficePath,
                 '/run/current-system/sw/bin/soffice',
                 '/run/current-system/sw/bin/libreoffice',
                 '/usr/bin/soffice',
                 '/usr/bin/libreoffice'
-            ]
+            ].filter(Boolean)
         };
         const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;
