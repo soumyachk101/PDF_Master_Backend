@@ -36,12 +36,8 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-
-// Only listen when running directly (local dev), not on Vercel
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-    app.listen(PORT, () => {
-        console.log(`PDFKit Backend running on port ${PORT}`);
-    });
-}
+app.listen(PORT, () => {
+    console.log(`PDFKit Backend running on port ${PORT}`);
+});
 
 module.exports = app;
