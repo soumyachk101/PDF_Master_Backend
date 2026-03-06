@@ -28,6 +28,11 @@ app.use(express.json());
 // Routes
 app.use('/api/pdf', pdfRoutes);
 
+// Root route
+app.get('/', (req, res) => {
+    res.json({ name: 'PDFKit API', version: '1.0.0', status: 'running', docs: '/health' });
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), env: process.env.NODE_ENV });
