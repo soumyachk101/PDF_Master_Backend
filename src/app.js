@@ -13,6 +13,9 @@ const errorHandler = require('./middleware/errorHandler')
 const app = express()
 const PORT = process.env.PORT || 4000
 
+// ─── Trust proxy for Railway (required for rate limiting) ─────────────────────
+app.set('trust proxy', true)
+
 // ─── Ensure temp directory exists ───────────────────────────────────────────
 const TEMP_DIR = path.join(__dirname, '../temp')
 try {
