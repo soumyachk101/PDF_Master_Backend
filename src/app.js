@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`PDFKit Backend running on port ${PORT}`);
 });
 
