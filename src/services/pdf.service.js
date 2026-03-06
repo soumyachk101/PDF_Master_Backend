@@ -161,7 +161,9 @@ exports.wordToPdf = async (filePath) => {
                 '/run/current-system/sw/bin/libreoffice',
                 '/usr/bin/soffice',
                 '/usr/bin/libreoffice'
-            ].filter(Boolean)
+            ].filter(Boolean),
+            tmpOptions: { dir: require('os').tmpdir() },
+            sofficeAdditionalArgs: ['--norestore', '--nologo']
         };
         const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;
@@ -191,7 +193,9 @@ exports.powerpointToPdf = async (filePath) => {
                 '/run/current-system/sw/bin/libreoffice',
                 '/usr/bin/soffice',
                 '/usr/bin/libreoffice'
-            ].filter(Boolean)
+            ].filter(Boolean),
+            tmpOptions: { dir: require('os').tmpdir() },
+            sofficeAdditionalArgs: ['--norestore', '--nologo']
         };
         const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;

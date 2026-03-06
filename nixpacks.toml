@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["nodejs_20", "ghostscript", "qpdf", "chromium", "libreoffice"]
-
-[phases.build]
-cmds = ["npm ci --omit=dev"]
-
-[start]
-cmd = "node src/app.js"
