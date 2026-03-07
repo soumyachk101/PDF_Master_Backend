@@ -324,8 +324,8 @@ if __name__ == "__main__":
     try {
         await fs.writeFile(scriptPath, pythonScriptContent);
 
-        // Use python3 on Linux/Mac, python on Windows
-        const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
+        // Use venv python on Linux (Railway), fallback to python on Windows
+        const pythonCmd = os.platform() === 'win32' ? 'python' : '/app/venv/bin/python';
         const command = `${pythonCmd} "${scriptPath}" "${filePath}" "${tempOutputFile}"`;
         
         await execPromise(command);

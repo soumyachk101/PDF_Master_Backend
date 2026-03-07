@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["...", "python3", "python311Packages.pip", "msttcorefonts-installer"]
+nixPkgs = ["...", "python3"]
 
 [phases.build]
-cmds = ["npm install", "pip install pdf2docx --break-system-packages"]
+cmds = ["...", "python3 -m venv /app/venv", "/app/venv/bin/pip install pdf2docx"]
 
 [start]
 cmd = "npm start"
