@@ -287,10 +287,43 @@ exports.pdfToWord = async (filePath) => {
     const { v4: uuidv4 } = require('uuid');
     const execPromise = util.promisify(exec);
 
-    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-converted.docx`);
-    const scriptPath = path.join(__dirname, '../../pdf2docx_converter.py');
+    const tempId = uuidv4();
+    const tempOutputFile = path.join(os.tmpdir(), `${tempId}-converted.docx`);
+    const scriptPath = path.join(os.tmpdir(), `${tempId}-pdf2docx.py`);
+
+    const pythonScriptContent = `
+import sys
+import os
+from pdf2docx import Converter
+
+def convert_pdf_to_docx(pdf_path, docx_path):
+    try:
+        if not os.path.exists(pdf_path):
+            print(f"Error: PDF file not found at {pdf_path}")
+            sys.exit(1)
+            
+        cv = Converter(pdf_path)
+        cv.convert(docx_path, start=0, end=None)
+        cv.close()
+        print(f"Success: {docx_path}")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python script.py <input.pdf> <output.docx>")
+        sys.exit(1)
+        
+    input_pdf = sys.argv[1]
+    output_docx = sys.argv[2]
+    
+    convert_pdf_to_docx(input_pdf, output_docx)
+`;
 
     try {
+        await fs.writeFile(scriptPath, pythonScriptContent);
+
         // Use python3 on Linux/Mac, python on Windows
         const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
         const command = `${pythonCmd} "${scriptPath}" "${filePath}" "${tempOutputFile}"`;
@@ -304,6 +337,7 @@ exports.pdfToWord = async (filePath) => {
         throw new Error('Failed to convert PDF to Word natively. ' + e.message);
     } finally {
         try { await fs.unlink(tempOutputFile); } catch (e) { }
+        try { await fs.unlink(scriptPath); } catch (e) { }
     }
 };
 
