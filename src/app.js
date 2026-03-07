@@ -14,7 +14,7 @@ const app = express()
 const PORT = process.env.PORT || 4000
 
 // ─── Trust proxy for Railway (required for rate limiting) ─────────────────────
-app.set('trust proxy', true)
+app.set('trust proxy', 1)
 
 // ─── Ensure temp directory exists ───────────────────────────────────────────
 const TEMP_DIR = path.join(__dirname, '../temp')

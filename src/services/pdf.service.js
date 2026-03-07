@@ -271,8 +271,14 @@ exports.pdfToWord = async (filePath) => {
 exports.pdfToExcel = async (filePath) => {
     const pdfParse = require('pdf-parse');
     const fs = require('fs').promises;
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-uncompressed.pdf`);
+
     try {
-        const fileContent = await fs.readFile(filePath);
+        // Decompress PDF streams using qpdf first to fix "Unknown compression method" errors in pdf-parse
+        const command = `qpdf --stream-data=uncompress "${filePath}" "${tempOutputFile}"`;
+        await execPromise(command);
+
+        const fileContent = await fs.readFile(tempOutputFile);
         const data = await pdfParse(fileContent);
 
         const rows = data.text.split('\n').filter(line => line.trim().length > 0);
@@ -284,6 +290,8 @@ exports.pdfToExcel = async (filePath) => {
         return Buffer.from(csvRows.join('\n'));
     } catch (e) {
         throw new Error('Failed to extract text to CSV. ' + e.message);
+    } finally {
+        try { await fs.unlink(tempOutputFile); } catch (e) { }
     }
 };
 
