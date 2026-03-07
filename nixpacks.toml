@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["ghostscript", "qpdf", "chromium", "libreoffice"]
+nixPkgs = ["ghostscript", "qpdf", "chromium", "libreoffice", "imagemagick", "graphicsmagick"]
 
 [start]
 cmd = "node src/app.js"
