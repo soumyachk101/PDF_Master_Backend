@@ -274,8 +274,8 @@ exports.pdfToExcel = async (filePath) => {
     const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-uncompressed.pdf`);
 
     try {
-        // Decompress PDF streams using qpdf first to fix "Unknown compression method" errors in pdf-parse
-        const command = `qpdf --stream-data=uncompress "${filePath}" "${tempOutputFile}"`;
+        // Rewrite PDF to a normalized pdf v1.4 to fix "Unknown compression method" errors in pdf-parse
+        const command = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`;
         await execPromise(command);
 
         const fileContent = await fs.readFile(tempOutputFile);
