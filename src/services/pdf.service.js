@@ -149,14 +149,17 @@ exports.wordToPdf = async (filePath) => {
     try {
         let dynamicSofficePath = '';
         try {
-            dynamicSofficePath = execSync('which soffice').toString().trim();
+            const searchCmd = os.platform() === 'win32' ? 'where soffice' : 'which soffice';
+            dynamicSofficePath = execSync(searchCmd).toString().trim().split('\r\n')[0];
         } catch (err) {
-            console.error('Could not find soffice via which command', err);
+            console.error('Could not find soffice via OS search command', err);
         }
 
         const options = {
             sofficeBinaryPaths: [
                 dynamicSofficePath,
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
                 '/run/current-system/sw/bin/soffice',
                 '/run/current-system/sw/bin/libreoffice',
                 '/usr/bin/soffice',
@@ -169,7 +172,7 @@ exports.wordToPdf = async (filePath) => {
         return pdfBuffer;
     } catch (e) {
         console.error('LibreOffice convert error:', e);
-        throw new Error(`Failed to convert Word to PDF. If deployed, LibreOffice path may be missing. Error: ${e.message}`);
+        throw new Error(`Failed to convert Word to PDF. If deployed, LibreOffice path may be missing or file might be corrupted. Error: ${e.message}`);
     }
 };
 
@@ -181,14 +184,17 @@ exports.powerpointToPdf = async (filePath) => {
     try {
         let dynamicSofficePath = '';
         try {
-            dynamicSofficePath = execSync('which soffice').toString().trim();
+            const searchCmd = os.platform() === 'win32' ? 'where soffice' : 'which soffice';
+            dynamicSofficePath = execSync(searchCmd).toString().trim().split('\r\n')[0];
         } catch (err) {
-            console.error('Could not find soffice via which command', err);
+            console.error('Could not find soffice via OS search command', err);
         }
 
         const options = {
             sofficeBinaryPaths: [
                 dynamicSofficePath,
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
                 '/run/current-system/sw/bin/soffice',
                 '/run/current-system/sw/bin/libreoffice',
                 '/usr/bin/soffice',
@@ -255,9 +261,18 @@ exports.pdfToWord = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
     try {
         let dynamicSofficePath = '';
-        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        try {
+            const searchCmd = os.platform() === 'win32' ? 'where soffice' : 'which soffice';
+            dynamicSofficePath = execSync(searchCmd).toString().trim().split('\r\n')[0];
+        } catch (err) { }
         const options = {
-            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            sofficeBinaryPaths: [
+                dynamicSofficePath,
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+                '/run/current-system/sw/bin/soffice',
+                '/usr/bin/soffice'
+            ].filter(Boolean),
             tmpOptions: { dir: require('os').tmpdir() },
             sofficeAdditionalArgs: ['--infilter=writer_pdf_import', '--norestore', '--nologo']
         };
@@ -406,9 +421,18 @@ exports.excelToPdf = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
     try {
         let dynamicSofficePath = '';
-        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        try {
+            const searchCmd = os.platform() === 'win32' ? 'where soffice' : 'which soffice';
+            dynamicSofficePath = execSync(searchCmd).toString().trim().split('\r\n')[0];
+        } catch (err) { }
         const options = {
-            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            sofficeBinaryPaths: [
+                dynamicSofficePath,
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+                '/run/current-system/sw/bin/soffice',
+                '/usr/bin/soffice'
+            ].filter(Boolean),
             tmpOptions: { dir: require('os').tmpdir() },
             sofficeAdditionalArgs: ['--norestore', '--nologo']
         };
@@ -454,9 +478,18 @@ exports.pdfToPptx = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
     try {
         let dynamicSofficePath = '';
-        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        try {
+            const searchCmd = os.platform() === 'win32' ? 'where soffice' : 'which soffice';
+            dynamicSofficePath = execSync(searchCmd).toString().trim().split('\r\n')[0];
+        } catch (err) { }
         const options = {
-            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            sofficeBinaryPaths: [
+                dynamicSofficePath,
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+                '/run/current-system/sw/bin/soffice',
+                '/usr/bin/soffice'
+            ].filter(Boolean),
             tmpOptions: { dir: require('os').tmpdir() },
             sofficeAdditionalArgs: ['--infilter=impress_pdf_import', '--norestore', '--nologo']
         };

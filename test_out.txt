@@ -1,0 +1,36 @@
+
+--- Testing Merge PDF ---
+Γ£à Merge PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1426
+
+--- Testing Split PDF ---
+Γ£à Split PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1042
+
+--- Testing Remove Pages ---
+Γ£à Remove Pages SUCCESS! Status: 200, Type: application/pdf, Size: 1238
+
+--- Testing Extract Pages ---
+Γ£à Extract Pages SUCCESS! Status: 200, Type: application/pdf, Size: 1040
+
+--- Testing Compress PDF ---
+Γ£à Compress PDF SUCCESS! Status: 200, Type: application/pdf, Size: 2550
+
+--- Testing JPG to PDF ---
+Γ£à JPG to PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1272
+
+--- Testing Word to PDF ---
+Γ£à Word to PDF SUCCESS! Status: 200, Type: application/pdf, Size: 7101
+
+--- Testing PDF to JPG ---
+
+--- Testing Rotate PDF ---
+Γ¥î PDF to JPG FAILED: {"error":{"message":"Could not execute GraphicsMagick/ImageMagick: gm \"convert\" \"-density\" \"150x150\" \"-quality\" \"75\" \"-[0]\" \"-units\" \"PixelsPerInch\" \"-resize\" \"1240x1754!\" \"-compress\" \"jpeg\" \"/tmp/cb62e18a-235e-4273-b9ed-db1414ab8bb3.1.jpeg\" this most likely means the gm/convert binaries can't be found"}}
+Γ£à Rotate PDF SUCCESS! Status: 200, Type: application/pdf, Size: 860
+
+--- Testing Page Numbers ---
+Γ£à Page Numbers SUCCESS! Status: 200, Type: application/pdf, Size: 1241
+
+--- Testing Watermark ---
+Γ£à Watermark SUCCESS! Status: 200, Type: application/pdf, Size: 1295
+
+--- Testing Protect PDF ---
+Γ¥î Protect PDF FAILED: {"error":{"message":"Failed to protect PDF."}}

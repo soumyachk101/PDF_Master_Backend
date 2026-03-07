@@ -1,0 +1,45 @@
+
+--- Testing Merge PDF ---
+Γ£à Merge PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1426
+
+--- Testing Split PDF ---
+Γ£à Split PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1045
+
+--- Testing Remove Pages ---
+Γ£à Remove Pages SUCCESS! Status: 200, Type: application/pdf, Size: 1238
+
+--- Testing Extract Pages ---
+Γ£à Extract Pages SUCCESS! Status: 200, Type: application/pdf, Size: 1041
+
+--- Testing Compress PDF ---
+Γ£à Compress PDF SUCCESS! Status: 200, Type: application/pdf, Size: 2550
+
+--- Testing JPG to PDF ---
+Γ£à JPG to PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1272
+
+--- Testing Word to PDF ---
+Γ£à Word to PDF SUCCESS! Status: 200, Type: application/pdf, Size: 7101
+
+--- Testing PDF to JPG ---
+Γ£à PDF to JPG SUCCESS! Status: 200, Type: application/zip, Size: 122030
+
+--- Testing PDF to Word ---
+Γ£à PDF to Word SUCCESS! Status: 200, Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document, Size: 5007
+
+--- Testing PDF to Excel ---
+Γ¥î PDF to Excel FAILED: {"error":{"message":"Failed to extract text to CSV. pdfParse is not a function"}}
+
+--- Testing PDF to PowerPoint ---
+Γ£à PDF to PowerPoint SUCCESS! Status: 200, Type: application/vnd.openxmlformats-officedocument.presentationml.presentation, Size: 21046
+
+--- Testing Rotate PDF ---
+Γ£à Rotate PDF SUCCESS! Status: 200, Type: application/pdf, Size: 862
+
+--- Testing Page Numbers ---
+Γ£à Page Numbers SUCCESS! Status: 200, Type: application/pdf, Size: 1240
+
+--- Testing Watermark ---
+Γ£à Watermark SUCCESS! Status: 200, Type: application/pdf, Size: 1295
+
+--- Testing Protect PDF ---
+Γ£à Protect PDF SUCCESS! Status: 200, Type: application/pdf, Size: 1654
