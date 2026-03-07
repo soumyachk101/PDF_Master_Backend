@@ -279,31 +279,31 @@ exports.pdfToJpg = async (filePath) => {
 };
 
 exports.pdfToWord = async (filePath) => {
-    const libre = require('libreoffice-convert');
-    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
-    const { execSync } = require('child_process');
-    const fileContent = await fs.readFile(filePath);
+    const os = require('os');
+    const path = require('path');
+    const { exec } = require('child_process');
+    const util = require('util');
+    const fs = require('fs').promises;
+    const { v4: uuidv4 } = require('uuid');
+    const execPromise = util.promisify(exec);
+
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-converted.docx`);
+    const scriptPath = path.join(__dirname, '../../pdf2docx_converter.py');
+
     try {
-        let dynamicSofficePath = '';
-        try {
-            const searchCmd = os.platform() === 'win32' ? 'where soffice' : 'which soffice';
-            dynamicSofficePath = execSync(searchCmd).toString().trim().split('\r\n')[0];
-        } catch (err) { }
-        const options = {
-            sofficeBinaryPaths: [
-                dynamicSofficePath,
-                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
-                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
-                '/run/current-system/sw/bin/soffice',
-                '/usr/bin/soffice'
-            ].filter(Boolean),
-            tmpOptions: { dir: require('os').tmpdir() },
-            sofficeAdditionalArgs: ['--infilter=writer_pdf_import', '--norestore', '--nologo']
-        };
-        const docxBuffer = await libreConvertWithOptions(fileContent, '.docx', undefined, options);
-        return docxBuffer;
+        // Use python3 on Linux/Mac, python on Windows
+        const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
+        const command = `${pythonCmd} "${scriptPath}" "${filePath}" "${tempOutputFile}"`;
+        
+        await execPromise(command);
+
+        const docxBuffer = await fs.readFile(tempOutputFile);
+        return Buffer.from(docxBuffer);
     } catch (e) {
-        throw new Error('Failed to convert PDF to Word. ' + e.message);
+        console.error('PDF to Word (pdf2docx) error:', e);
+        throw new Error('Failed to convert PDF to Word natively. ' + e.message);
+    } finally {
+        try { await fs.unlink(tempOutputFile); } catch (e) { }
     }
 };
 

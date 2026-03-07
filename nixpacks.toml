@@ -1,5 +1,8 @@
 [phases.setup]
-nixPkgs = ["ghostscript", "qpdf", "chromium", "libreoffice", "imagemagick", "graphicsmagick"]
+nixPkgs = ["...", "python3", "python311Packages.pip", "msttcorefonts-installer"]
+
+[phases.build]
+cmds = ["npm install", "pip install pdf2docx --break-system-packages"]
 
 [start]
-cmd = "node src/app.js"
+cmd = "npm start"
