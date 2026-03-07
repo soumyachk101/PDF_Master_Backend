@@ -206,44 +206,46 @@ exports.powerpointToPdf = async (filePath) => {
 };
 
 exports.pdfToJpg = async (filePath) => {
-    const { fromPath } = require('pdf2pic');
     const tempDir = os.tmpdir();
     const baseName = uuidv4();
+    const outputPrefix = path.join(tempDir, `${baseName}-page-%03d.jpg`);
 
-    const converter = fromPath(filePath, {
-        density: 150,
-        saveFilename: baseName,
-        savePath: tempDir,
-        format: 'jpeg',
-        width: 1240,
-        height: 1754,
-    });
+    try {
+        const command = `gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -r150 -dJPEGQ=85 -sOutputFile="${outputPrefix}" "${filePath}"`;
+        await execPromise(command);
 
-    // Get page count first
-    const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
-    const totalPages = pdfDoc.getPageCount();
+        // Find all generated images
+        const files = await fs.readdir(tempDir);
+        const generatedImages = files.filter(f => f.startsWith(`${baseName}-page-`) && f.endsWith('.jpg')).sort();
 
-    if (totalPages === 1) {
-        const result = await converter(1);
-        const imgBuffer = await fs.readFile(result.path);
-        try { await fs.unlink(result.path); } catch (e) { }
-        return imgBuffer;
+        if (generatedImages.length === 0) {
+            throw new Error("No images generated");
+        }
+
+        if (generatedImages.length === 1) {
+            const imgPath = path.join(tempDir, generatedImages[0]);
+            const imgBuffer = await fs.readFile(imgPath);
+            try { await fs.unlink(imgPath); } catch (e) { }
+            return imgBuffer;
+        }
+
+        // Multiple pages -> zip them
+        const JSZip = require('jszip');
+        const zip = new JSZip();
+
+        for (let i = 0; i < generatedImages.length; i++) {
+            const imgPath = path.join(tempDir, generatedImages[i]);
+            const imgBuffer = await fs.readFile(imgPath);
+            zip.file(`page-${i + 1}.jpg`, imgBuffer);
+            try { await fs.unlink(imgPath); } catch (e) { }
+        }
+
+        const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+        return zipBuffer;
+    } catch (error) {
+        console.error('PDF to JPG error:', error);
+        throw new Error('Failed to convert PDF to JPG. ' + error.message);
     }
-
-    // Multiple pages -> zip them
-    const JSZip = require('jszip');
-    const zip = new JSZip();
-
-    for (let i = 1; i <= totalPages; i++) {
-        const result = await converter(i);
-        const imgBuffer = await fs.readFile(result.path);
-        zip.file(`page-${i}.jpg`, imgBuffer);
-        try { await fs.unlink(result.path); } catch (e) { }
-    }
-
-    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-    return zipBuffer;
 };
 
 exports.pdfToWord = async (filePath) => {
