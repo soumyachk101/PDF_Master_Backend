@@ -269,20 +269,22 @@ exports.pdfToWord = async (filePath) => {
 };
 
 exports.pdfToExcel = async (filePath) => {
-    const pdfParse = require('pdf-parse');
     const fs = require('fs').promises;
-    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-uncompressed.pdf`);
+    const path = require('path');
+    const os = require('os');
+    const { v4: uuidv4 } = require('uuid');
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-extracted.txt`);
 
     try {
-        // Rewrite PDF to a normalized pdf v1.4 to fix "Unknown compression method" errors in pdf-parse
-        const command = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`;
+        // Extract text directly using Ghostscript's txtwrite device to avoid all PDF.js "bad Xref" and stream errs
+        const command = `gs -sDEVICE=txtwrite -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`;
         await execPromise(command);
 
-        const fileContent = await fs.readFile(tempOutputFile);
-        const data = await pdfParse(fileContent);
+        const textData = await fs.readFile(tempOutputFile, 'utf-8');
 
-        const rows = data.text.split('\n').filter(line => line.trim().length > 0);
+        const rows = textData.split('\n').filter(line => line.trim().length > 0);
         const csvRows = rows.map(row => {
+            // Split by 2 or more spaces to guess column structures
             const columns = row.trim().split(/\s{2,}/);
             return columns.map(col => `"${col.replace(/"/g, '""')}"`).join(',');
         });
