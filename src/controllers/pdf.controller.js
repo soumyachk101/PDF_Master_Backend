@@ -34,8 +34,8 @@ exports.splitPdf = async (req, res, next) => {
 
         fs.unlinkSync(req.file.path);
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="split-result.pdf"');
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', 'attachment; filename="split-result.zip"');
         res.send(splitBuffer);
     } catch (error) {
         next(error);

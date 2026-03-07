@@ -25,31 +25,55 @@ exports.splitPdf = async (filePath, ranges) => {
     const fileContent = await fs.readFile(filePath);
     const pdfDoc = await PDFDocument.load(fileContent);
     const totalPages = pdfDoc.getPageCount();
-    const newPdf = await PDFDocument.create();
+    const JSZip = require('jszip');
+    const zip = new JSZip();
 
-    let indicesToCopy = [0];
-
+    let rangesToProcess = [];
     if (ranges && typeof ranges === 'string' && ranges.trim()) {
-        indicesToCopy = [];
         const parts = ranges.split(',');
         for (const part of parts) {
             if (part.includes('-')) {
                 const [start, end] = part.split('-').map(Number);
-                for (let i = start; i <= end; i++) {
-                    if (i > 0 && i <= totalPages) indicesToCopy.push(i - 1);
-                }
+                rangesToProcess.push({ start: start - 1, end: end - 1 });
             } else {
                 const i = Number(part);
-                if (i > 0 && i <= totalPages) indicesToCopy.push(i - 1);
+                if (i > 0 && i <= totalPages) rangesToProcess.push({ start: i - 1, end: i - 1 });
             }
         }
-        if (indicesToCopy.length === 0) indicesToCopy = [0];
+    } else {
+        // Default: split every page
+        for (let i = 0; i < totalPages; i++) {
+            rangesToProcess.push({ start: i, end: i });
+        }
     }
 
-    const copiedPages = await newPdf.copyPages(pdfDoc, indicesToCopy);
-    copiedPages.forEach((page) => newPdf.addPage(page));
-    const newPdfBytes = await newPdf.save();
-    return Buffer.from(newPdfBytes);
+    if (rangesToProcess.length === 0) {
+        for (let i = 0; i < totalPages; i++) {
+            rangesToProcess.push({ start: i, end: i });
+        }
+    }
+
+    for (let idx = 0; idx < rangesToProcess.length; idx++) {
+        const range = rangesToProcess[idx];
+        const newPdf = await PDFDocument.create();
+        const pagesToCopy = [];
+        for (let i = range.start; i <= range.end; i++) {
+            if (i >= 0 && i < totalPages) pagesToCopy.push(i);
+        }
+
+        if (pagesToCopy.length > 0) {
+            const copiedPages = await newPdf.copyPages(pdfDoc, pagesToCopy);
+            copiedPages.forEach((page) => newPdf.addPage(page));
+            const pdfBytes = await newPdf.save();
+            const fileName = range.start === range.end ?
+                `page-${range.start + 1}.pdf` :
+                `pages-${range.start + 1}-to-${range.end + 1}.pdf`;
+            zip.file(fileName, pdfBytes);
+        }
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    return zipBuffer;
 };
 
 exports.extractPdf = async (filePath, ranges) => {
