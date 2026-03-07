@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["...", "python3"]
+nixPkgs = ["...", "python3", "python311Packages.pip"]
 
 [phases.build]
-cmds = ["...", "python3 -m venv .venv", ".venv/bin/pip install pdf2docx"]
+cmds = ["...", "pip install pdf2docx --target .python_deps"]
 
 [start]
 cmd = "npm start"

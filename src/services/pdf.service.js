@@ -324,11 +324,18 @@ if __name__ == "__main__":
     try {
         await fs.writeFile(scriptPath, pythonScriptContent);
 
-        // Use local .venv python on Linux (Railway), fallback to python on Windows
-        const pythonCmd = os.platform() === 'win32' ? 'python' : path.join(process.cwd(), '.venv', 'bin', 'python');
+        // Fallback to native python commands but inject PYTHONPATH so it finds our custom local dependencies
+        const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
         const command = `${pythonCmd} "${scriptPath}" "${filePath}" "${tempOutputFile}"`;
         
-        await execPromise(command);
+        const envOptions = {
+            env: {
+                ...process.env,
+                PYTHONPATH: path.join(process.cwd(), '.python_deps')
+            }
+        };
+
+        await execPromise(command, envOptions);
 
         const docxBuffer = await fs.readFile(tempOutputFile);
         return Buffer.from(docxBuffer);
