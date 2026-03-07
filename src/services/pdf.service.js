@@ -272,14 +272,11 @@ exports.pdfToExcel = async (filePath) => {
 };
 
 exports.unlockPdf = async (filePath, password) => {
-    const qpdf = require('node-qpdf2');
     const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-unlocked.pdf`);
     try {
-        const options = {
-            keyLength: 256,
-            password: password || ''
-        };
-        await qpdf.decrypt(filePath, tempOutputFile, options);
+        const passArg = password ? `--password=${password}` : '';
+        const command = `qpdf --decrypt ${passArg} "${filePath}" "${tempOutputFile}"`;
+        await execPromise(command);
         const unlockedBuffer = await fs.readFile(tempOutputFile);
         return Buffer.from(unlockedBuffer);
     } catch (e) {
@@ -291,19 +288,17 @@ exports.unlockPdf = async (filePath, password) => {
 };
 
 exports.protectPdf = async (filePath, password) => {
-    const qpdf = require('node-qpdf2');
     const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-protected.pdf`);
     try {
-        const options = {
-            keyLength: 256,
-            password: password
-        };
-        await qpdf.encrypt(filePath, options, tempOutputFile);
+        const passStr = password || 'protected';
+        // 256-bit encryption, user and owner passwords are the same here
+        const command = `qpdf --encrypt "${passStr}" "${passStr}" 256 -- "${filePath}" "${tempOutputFile}"`;
+        await execPromise(command);
         const protectedBuffer = await fs.readFile(tempOutputFile);
         return Buffer.from(protectedBuffer);
     } catch (e) {
         console.error('Protect error:', e);
-        throw new Error('Failed to protect PDF.');
+        throw new Error(`Failed to protect PDF: ${e.message}`);
     } finally {
         try { await fs.unlink(tempOutputFile); } catch (e) { }
     }
