@@ -250,26 +250,41 @@ exports.pdfToJpg = async (filePath) => {
 
 exports.pdfToWord = async (filePath) => {
     const libre = require('libreoffice-convert');
-    const libreConvert = util.promisify(libre.convert);
+    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
+    const { execSync } = require('child_process');
     const fileContent = await fs.readFile(filePath);
     try {
-        const docxBuffer = await libreConvert(fileContent, '.docx', undefined);
+        let dynamicSofficePath = '';
+        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        const options = {
+            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            tmpOptions: { dir: require('os').tmpdir() },
+            sofficeAdditionalArgs: ['--infilter=writer_pdf_import', '--norestore', '--nologo']
+        };
+        const docxBuffer = await libreConvertWithOptions(fileContent, '.docx', undefined, options);
         return docxBuffer;
     } catch (e) {
-        console.error('LibreOffice error:', e);
-        throw new Error('Failed to convert PDF to Word.');
+        throw new Error('Failed to convert PDF to Word. ' + e.message);
     }
 };
 
 exports.pdfToExcel = async (filePath) => {
     const libre = require('libreoffice-convert');
-    const libreConvert = util.promisify(libre.convert);
+    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
+    const { execSync } = require('child_process');
     const fileContent = await fs.readFile(filePath);
     try {
-        const xlsxBuffer = await libreConvert(fileContent, '.xlsx', undefined);
+        let dynamicSofficePath = '';
+        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        const options = {
+            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            tmpOptions: { dir: require('os').tmpdir() },
+            sofficeAdditionalArgs: ['--infilter=calc_pdf_import', '--norestore', '--nologo']
+        };
+        const xlsxBuffer = await libreConvertWithOptions(fileContent, '.xlsx', undefined, options);
         return xlsxBuffer;
     } catch (e) {
-        throw new Error('Failed to convert PDF to Excel.');
+        throw new Error('Failed to convert PDF to Excel. ' + e.message);
     }
 };
 
@@ -377,13 +392,21 @@ exports.addPageNumbers = async (filePath) => {
 
 exports.excelToPdf = async (filePath) => {
     const libre = require('libreoffice-convert');
-    const libreConvert = util.promisify(libre.convert);
+    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
+    const { execSync } = require('child_process');
     const fileContent = await fs.readFile(filePath);
     try {
-        const pdfBuffer = await libreConvert(fileContent, '.pdf', undefined);
+        let dynamicSofficePath = '';
+        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        const options = {
+            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            tmpOptions: { dir: require('os').tmpdir() },
+            sofficeAdditionalArgs: ['--norestore', '--nologo']
+        };
+        const pdfBuffer = await libreConvertWithOptions(fileContent, '.pdf', undefined, options);
         return pdfBuffer;
     } catch (e) {
-        throw new Error('Failed to convert Excel to PDF.');
+        throw new Error('Failed to convert Excel to PDF. ' + e.message);
     }
 };
 
@@ -417,13 +440,21 @@ exports.htmlToPdf = async (url) => {
 
 exports.pdfToPptx = async (filePath) => {
     const libre = require('libreoffice-convert');
-    const libreConvert = util.promisify(libre.convert);
+    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
+    const { execSync } = require('child_process');
     const fileContent = await fs.readFile(filePath);
     try {
-        const pptxBuffer = await libreConvert(fileContent, '.pptx', undefined);
+        let dynamicSofficePath = '';
+        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
+        const options = {
+            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
+            tmpOptions: { dir: require('os').tmpdir() },
+            sofficeAdditionalArgs: ['--infilter=impress_pdf_import', '--norestore', '--nologo']
+        };
+        const pptxBuffer = await libreConvertWithOptions(fileContent, '.pptx', undefined, options);
         return pptxBuffer;
     } catch (e) {
-        throw new Error('Failed to convert PDF to PowerPoint.');
+        throw new Error('Failed to convert PDF to PowerPoint. ' + e.message);
     }
 };
 
