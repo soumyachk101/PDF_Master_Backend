@@ -269,22 +269,21 @@ exports.pdfToWord = async (filePath) => {
 };
 
 exports.pdfToExcel = async (filePath) => {
-    const libre = require('libreoffice-convert');
-    const libreConvertWithOptions = util.promisify(libre.convertWithOptions);
-    const { execSync } = require('child_process');
-    const fileContent = await fs.readFile(filePath);
+    const pdfParse = require('pdf-parse');
+    const fs = require('fs').promises;
     try {
-        let dynamicSofficePath = '';
-        try { dynamicSofficePath = execSync('which soffice').toString().trim(); } catch (err) { }
-        const options = {
-            sofficeBinaryPaths: [dynamicSofficePath, '/run/current-system/sw/bin/soffice', '/usr/bin/soffice'].filter(Boolean),
-            tmpOptions: { dir: require('os').tmpdir() },
-            sofficeAdditionalArgs: ['--infilter=calc_pdf_import', '--norestore', '--nologo']
-        };
-        const xlsxBuffer = await libreConvertWithOptions(fileContent, '.xlsx', undefined, options);
-        return xlsxBuffer;
+        const fileContent = await fs.readFile(filePath);
+        const data = await pdfParse(fileContent);
+
+        const rows = data.text.split('\n').filter(line => line.trim().length > 0);
+        const csvRows = rows.map(row => {
+            const columns = row.trim().split(/\s{2,}/);
+            return columns.map(col => `"${col.replace(/"/g, '""')}"`).join(',');
+        });
+
+        return Buffer.from(csvRows.join('\n'));
     } catch (e) {
-        throw new Error('Failed to convert PDF to Excel. ' + e.message);
+        throw new Error('Failed to extract text to CSV. ' + e.message);
     }
 };
 

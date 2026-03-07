@@ -187,11 +187,11 @@ exports.pdfToWord = async (req, res, next) => {
 exports.pdfToExcel = async (req, res, next) => {
     try {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
-        const xlsxBuffer = await pdfService.pdfToExcel(req.file.path);
+        const csvBuffer = await pdfService.pdfToExcel(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-excel.xlsx"');
-        res.send(xlsxBuffer);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="converted-excel.csv"');
+        res.send(csvBuffer);
     } catch (error) { next(error); }
 };
 
