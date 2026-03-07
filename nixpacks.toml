@@ -2,7 +2,7 @@
 nixPkgs = ["...", "python3"]
 
 [phases.build]
-cmds = ["...", "python3 -m venv /app/venv", "/app/venv/bin/pip install pdf2docx"]
+cmds = ["...", "python3 -m venv .venv", ".venv/bin/pip install pdf2docx"]
 
 [start]
 cmd = "npm start"
