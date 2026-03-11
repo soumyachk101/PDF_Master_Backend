@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["ghostscript", "qpdf", "chromium", "libreoffice", "python3", "python3Packages.pip"]
+
+[phases.build]
+cmds = [
+  "npm install",
+  "pip3 install --no-cache-dir -r requirements.txt --target .python_deps"
+]
+
+[start]
+cmd = "PYTHONPATH=/app/.python_deps:$PYTHONPATH npm start"
