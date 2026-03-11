@@ -20,7 +20,17 @@ exports.mergePdfs = async (filePaths) => {
 
     for (const filePath of filePaths) {
         const fileContent = await fs.readFile(filePath);
-        const pdfDoc = await PDFDocument.load(fileContent);
+        let pdfDoc;
+        try {
+            pdfDoc = await PDFDocument.load(fileContent);
+        } catch (err) {
+            if (err.message && err.message.includes('encrypted')) {
+                const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+                error.status = 400;
+                throw error;
+            }
+            throw err;
+        }
         const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
         copiedPages.forEach((page) => mergedPdf.addPage(page));
     }
@@ -31,7 +41,17 @@ exports.mergePdfs = async (filePaths) => {
 
 exports.splitPdf = async (filePath, ranges) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const totalPages = pdfDoc.getPageCount();
     const JSZip = require('jszip');
     const zip = new JSZip();
@@ -86,7 +106,17 @@ exports.splitPdf = async (filePath, ranges) => {
 
 exports.extractPdf = async (filePath, ranges) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const totalPages = pdfDoc.getPageCount();
     const newPdf = await PDFDocument.create();
 
@@ -149,7 +179,17 @@ exports.repairPdf = async (filePath) => {
 
 exports.flattenPdf = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const form = pdfDoc.getForm();
     form.flatten();
     const flattenedBytes = await pdfDoc.save();
@@ -429,7 +469,17 @@ exports.protectPdf = async (filePath, password) => {
 
 exports.watermarkPdf = async (filePath, text) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const pages = pdfDoc.getPages();
 
     for (const page of pages) {
@@ -449,7 +499,17 @@ exports.watermarkPdf = async (filePath, text) => {
 
 exports.signPdf = async (filePath, signatureText) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const pages = pdfDoc.getPages();
     const firstPage = pages[0];
 
@@ -465,7 +525,17 @@ exports.signPdf = async (filePath, signatureText) => {
 
 exports.rotatePdf = async (filePath, degrees) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const pages = pdfDoc.getPages();
 
     for (const page of pages) {
@@ -478,7 +548,17 @@ exports.rotatePdf = async (filePath, degrees) => {
 
 exports.addPageNumbers = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const pages = pdfDoc.getPages();
     const totalPages = pages.length;
 
@@ -598,7 +678,17 @@ exports.pdfToPdfa = async (filePath) => {
 
 exports.removePages = async (filePath, pagesToRemoveString) => {
     const fileContent = await fs.readFile(filePath);
-    const pdfDoc = await PDFDocument.load(fileContent);
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent);
+    } catch (err) {
+        if (err.message && err.message.includes('encrypted')) {
+            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
+            error.status = 400;
+            throw error;
+        }
+        throw err;
+    }
     const totalPages = pdfDoc.getPageCount();
 
     let toRemove = [];
