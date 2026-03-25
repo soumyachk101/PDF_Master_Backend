@@ -200,6 +200,54 @@ exports.ocrPdf = async (filePath) => {
     throw new Error('OCR functionality coming soon.');
 };
 
+exports.translatePdf = async (filePath, sourceLang, targetLang) => {
+    const fs = require('fs').promises;
+    const axios = require('axios');
+    const pdfParse = require('pdf-parse');
+
+    try {
+        const dataBuffer = await fs.readFile(filePath);
+        const data = await pdfParse(dataBuffer);
+        const textData = data.text;
+        
+        // Chunk text to avoid hitting URL length limits for GET requests
+        const chunks = textData.match(/.{1,450}(\s|$)/g) || [];
+        
+        let translatedText = '';
+        const apiUrl = process.env.TRANSLATE_URL || 'https://api.mymemory.translated.net/get';
+        const langpair = `${sourceLang}|${targetLang}`;
+        const apiKey = process.env.TRANSLATE_API_KEY || '';
+
+        for (const chunk of chunks) {
+            if (!chunk.trim()) {
+                translatedText += chunk;
+                continue;
+            }
+            try {
+                const response = await axios.get(apiUrl, {
+                    params: {
+                        q: chunk.trim(),
+                        langpair: langpair,
+                        key: apiKey
+                    }
+                });
+                if (response.data && response.data.responseData && response.data.responseData.translatedText) {
+                    translatedText += response.data.responseData.translatedText + ' ';
+                } else {
+                    translatedText += chunk + ' ';
+                }
+            } catch (err) {
+                console.error('Translation error for chunk:', err.message);
+                translatedText += chunk + ' ';
+            }
+        }
+        
+        return Buffer.from(translatedText);
+    } catch (e) {
+        throw new Error('Failed to translate PDF. ' + e.message);
+    }
+};
+
 exports.jpgToPdf = async (filePaths) => {
     const sharp = require('sharp');
     const newPdf = await PDFDocument.create();
@@ -404,18 +452,12 @@ if __name__ == "__main__":
 
 exports.pdfToExcel = async (filePath) => {
     const fs = require('fs').promises;
-    const path = require('path');
-    const os = require('os');
-    const { v4: uuidv4 } = require('uuid');
-    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-extracted.txt`);
+    const pdfParse = require('pdf-parse');
 
     try {
-        const gs = getGsCommand();
-        // Extract text directly using Ghostscript's txtwrite device to avoid all PDF.js "bad Xref" and stream errs
-        const command = `${gs} -sDEVICE=txtwrite -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`;
-        await execPromise(command);
-
-        const textData = await fs.readFile(tempOutputFile, 'utf-8');
+        const dataBuffer = await fs.readFile(filePath);
+        const data = await pdfParse(dataBuffer);
+        const textData = data.text;
 
         const rows = textData.split('\n').filter(line => line.trim().length > 0);
         const csvRows = rows.map(row => {
@@ -427,8 +469,6 @@ exports.pdfToExcel = async (filePath) => {
         return Buffer.from(csvRows.join('\n'));
     } catch (e) {
         throw new Error('Failed to extract text to CSV. ' + e.message);
-    } finally {
-        try { await fs.unlink(tempOutputFile); } catch (e) { }
     }
 };
 

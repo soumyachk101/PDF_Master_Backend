@@ -55,6 +55,6 @@ router.post('/redact-pdf', upload.single('files'), pdfController.protectPdf); //
 router.post('/compare-pdf', upload.array('files', 2), pdfController.mergePdf); // MVP: Use merge as placeholder
 
 // ─── INTELLIGENCE ────────────────────────────────────────────────────────────
-router.post('/translate-pdf', upload.single('files'), pdfController.ocrPdf); // MVP: Use OCR as placeholder
+router.post('/translate-pdf', upload.single('files'), pdfController.translatePdf);
 
 module.exports = router;

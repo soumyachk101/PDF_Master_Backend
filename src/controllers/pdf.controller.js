@@ -120,6 +120,19 @@ exports.ocrPdf = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+exports.translatePdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF file to translate.' } });
+        const sourceLang = req.body.sourceLang || 'en';
+        const targetLang = req.body.targetLang || 'hi';
+        const translatedBuffer = await pdfService.translatePdf(req.file.path, sourceLang, targetLang);
+        fs.unlinkSync(req.file.path);
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', 'attachment; filename="translated-result.txt"');
+        res.send(translatedBuffer);
+    } catch (error) { next(error); }
+};
+
 // --- CONVERT TO PDF ---
 
 exports.jpgToPdf = async (req, res, next) => {
