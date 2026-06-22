@@ -37,7 +37,6 @@ exports.splitPdf = async (req, res, next) => {
 
         const ranges = req.body.ranges; // e.g., "1-3,5"
         const splitBuffer = await pdfService.splitPdf(req.file.path, ranges);
-        console.log(`[split-pdf] Generated zip buffer: size=${splitBuffer.length} bytes`);
 
         fs.unlinkSync(req.file.path);
 
@@ -183,11 +182,9 @@ exports.pdfToJpg = async (req, res, next) => {
         const isZip = resultBuffer[0] === 0x50 && resultBuffer[1] === 0x4B;
 
         if (isZip) {
-            console.log(`[pdf-to-jpg] Generated zip buffer: size=${resultBuffer.length} bytes`);
             res.setHeader('Content-Type', 'application/zip');
             res.setHeader('Content-Disposition', 'attachment; filename="converted-images.zip"');
         } else {
-            console.log(`[pdf-to-jpg] Generated jpg buffer: size=${resultBuffer.length} bytes`);
             res.setHeader('Content-Type', 'image/jpeg');
             res.setHeader('Content-Disposition', 'attachment; filename="converted-image.jpg"');
         }

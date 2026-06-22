@@ -22,15 +22,18 @@ exports.mergePdfs = async (filePaths) => {
         const fileContent = await fs.readFile(filePath);
         let pdfDoc;
         try {
-            pdfDoc = await PDFDocument.load(fileContent);
+            // Some PDFs are encrypted (password-protected). We choose to attempt loading them
+            // so we can provide a better UX for "owner-locked" files that still allow page extraction.
+            pdfDoc = await PDFDocument.load(fileContent, { ignoreEncryption: true });
         } catch (err) {
-            if (err.message && err.message.includes('encrypted')) {
-                const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-                error.status = 400;
-                throw error;
+            // Provide a clear, user-facing error message while keeping the original error for logs.
+            const message = (err && err.message) ? String(err.message) : '';
+            if (message.toLowerCase().includes('encrypted')) {
+                throw new Error('One of the PDFs is password-protected/encrypted. Please unlock it first (use the Unlock PDF tool) and then try merging again.');
             }
             throw err;
         }
+
         const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
         copiedPages.forEach((page) => mergedPdf.addPage(page));
     }
@@ -41,17 +44,7 @@ exports.mergePdfs = async (filePaths) => {
 
 exports.splitPdf = async (filePath, ranges) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const totalPages = pdfDoc.getPageCount();
     const JSZip = require('jszip');
     const zip = new JSZip();
@@ -106,17 +99,7 @@ exports.splitPdf = async (filePath, ranges) => {
 
 exports.extractPdf = async (filePath, ranges) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const totalPages = pdfDoc.getPageCount();
     const newPdf = await PDFDocument.create();
 
@@ -179,17 +162,7 @@ exports.repairPdf = async (filePath) => {
 
 exports.flattenPdf = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const form = pdfDoc.getForm();
     form.flatten();
     const flattenedBytes = await pdfDoc.save();
@@ -209,10 +182,10 @@ exports.translatePdf = async (filePath, sourceLang, targetLang) => {
         const dataBuffer = await fs.readFile(filePath);
         const data = await pdfParse(dataBuffer);
         const textData = data.text;
-        
+
         // Chunk text to avoid hitting URL length limits for GET requests
         const chunks = textData.match(/.{1,450}(\s|$)/g) || [];
-        
+
         let translatedText = '';
         const apiUrl = process.env.TRANSLATE_URL || 'https://api.mymemory.translated.net/get';
         const langpair = `${sourceLang}|${targetLang}`;
@@ -241,7 +214,7 @@ exports.translatePdf = async (filePath, sourceLang, targetLang) => {
                 translatedText += chunk + ' ';
             }
         }
-        
+
         return Buffer.from(translatedText);
     } catch (e) {
         throw new Error('Failed to translate PDF. ' + e.message);
@@ -452,12 +425,18 @@ if __name__ == "__main__":
 
 exports.pdfToExcel = async (filePath) => {
     const fs = require('fs').promises;
-    const pdfParse = require('pdf-parse');
+    const path = require('path');
+    const os = require('os');
+    const { v4: uuidv4 } = require('uuid');
+    const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-extracted.txt`);
 
     try {
-        const dataBuffer = await fs.readFile(filePath);
-        const data = await pdfParse(dataBuffer);
-        const textData = data.text;
+        const gs = getGsCommand();
+        // Extract text directly using Ghostscript's txtwrite device to avoid all PDF.js "bad Xref" and stream errs
+        const command = `${gs} -sDEVICE=txtwrite -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`;
+        await execPromise(command);
+
+        const textData = await fs.readFile(tempOutputFile, 'utf-8');
 
         const rows = textData.split('\n').filter(line => line.trim().length > 0);
         const csvRows = rows.map(row => {
@@ -469,6 +448,8 @@ exports.pdfToExcel = async (filePath) => {
         return Buffer.from(csvRows.join('\n'));
     } catch (e) {
         throw new Error('Failed to extract text to CSV. ' + e.message);
+    } finally {
+        try { await fs.unlink(tempOutputFile); } catch (e) { }
     }
 };
 
@@ -509,17 +490,7 @@ exports.protectPdf = async (filePath, password) => {
 
 exports.watermarkPdf = async (filePath, text) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const pages = pdfDoc.getPages();
 
     for (const page of pages) {
@@ -539,17 +510,7 @@ exports.watermarkPdf = async (filePath, text) => {
 
 exports.signPdf = async (filePath, signatureText) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const pages = pdfDoc.getPages();
     const firstPage = pages[0];
 
@@ -565,17 +526,7 @@ exports.signPdf = async (filePath, signatureText) => {
 
 exports.rotatePdf = async (filePath, degrees) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const pages = pdfDoc.getPages();
 
     for (const page of pages) {
@@ -588,17 +539,7 @@ exports.rotatePdf = async (filePath, degrees) => {
 
 exports.addPageNumbers = async (filePath) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const pages = pdfDoc.getPages();
     const totalPages = pages.length;
 
@@ -647,14 +588,6 @@ exports.excelToPdf = async (filePath) => {
 
 exports.htmlToPdf = async (url) => {
     const puppeteer = require('puppeteer');
-    
-    // Ensure URL has a protocol
-    let targetUrl = url.trim();
-    if (!/^https?:\/\//i.test(targetUrl)) {
-        targetUrl = 'https://' + targetUrl;
-        console.log(`[htmlToPdf] No protocol found, prepended https: ${targetUrl}`);
-    }
-
     const launchOptions = {
         headless: true,
         args: [
@@ -670,30 +603,14 @@ exports.htmlToPdf = async (url) => {
     if (process.env.PUPPETEER_EXECUTABLE_PATH) {
         launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
     }
-    
-    let browser;
+    const browser = await puppeteer.launch(launchOptions);
     try {
-        browser = await puppeteer.launch(launchOptions);
         const page = await browser.newPage();
-        
-        console.log(`[htmlToPdf] Navigating to: ${targetUrl}`);
-        await page.goto(targetUrl, { 
-            waitUntil: 'networkidle0', 
-            timeout: 60000 // Increased timeout to 60s
-        });
-        
-        const pdfBuffer = await page.pdf({ 
-            format: 'A4', 
-            printBackground: true,
-            margin: { top: '1cm', right: '1cm', bottom: '1cm', left: '1cm' }
-        });
-        
+        await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+        const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
         return Buffer.from(pdfBuffer);
-    } catch (error) {
-        console.error(`[htmlToPdf] Error for ${targetUrl}:`, error.message);
-        throw new Error(`Failed to capture webpage. Please ensure the URL is correct and accessible. Details: ${error.message}`);
     } finally {
-        if (browser) await browser.close();
+        await browser.close();
     }
 };
 
@@ -742,17 +659,7 @@ exports.pdfToPdfa = async (filePath) => {
 
 exports.removePages = async (filePath, pagesToRemoveString) => {
     const fileContent = await fs.readFile(filePath);
-    let pdfDoc;
-    try {
-        pdfDoc = await PDFDocument.load(fileContent);
-    } catch (err) {
-        if (err.message && err.message.includes('encrypted')) {
-            const error = new Error('This PDF is password-protected or encrypted. Please remove the password before uploading.');
-            error.status = 400;
-            throw error;
-        }
-        throw err;
-    }
+    const pdfDoc = await PDFDocument.load(fileContent);
     const totalPages = pdfDoc.getPageCount();
 
     let toRemove = [];

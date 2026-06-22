@@ -3,6 +3,16 @@ const router = express.Router();
 const { upload } = require('../middleware/upload');
 const pdfController = require('../controllers/pdf.controller');
 
+// Health check for API proxying (useful for /api/pdf/health checks)
+router.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    scope: 'pdf',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ─── ORGANIZE ────────────────────────────────────────────────────────────────
 router.post('/merge-pdf', upload.array('files', 20), pdfController.mergePdf);
 router.post('/split-pdf', upload.single('files'), pdfController.splitPdf);
