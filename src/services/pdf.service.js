@@ -1,4 +1,4 @@
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, StandardFonts, degrees, rgb } = require('pdf-lib');
 const fs = require('fs').promises;
 const { exec } = require('child_process');
 const util = require('util');
@@ -169,8 +169,43 @@ exports.flattenPdf = async (filePath) => {
     return Buffer.from(flattenedBytes);
 };
 
-exports.ocrPdf = async (filePath) => {
-    throw new Error('OCR functionality coming soon.');
+exports.ocrPdf = async (filePath, lang = 'eng') => {
+    const { pdfToPng } = require('pdf-to-png-converter');
+    const Tesseract = require('tesseract.js');
+
+    const MAX_OCR_PAGES = 30;
+    const pdfBuffer = await fs.readFile(filePath);
+
+    let pngPages;
+    try {
+        pngPages = await pdfToPng(pdfBuffer, {
+            viewportScale: 2.0,
+            pagesToProcess: Array.from({ length: MAX_OCR_PAGES }, (_, i) => i + 1),
+            strictPagesToProcess: false,
+        });
+    } catch (e) {
+        console.error('OCR render error:', e);
+        throw new Error('Failed to render PDF pages for OCR. The file may be corrupted or encrypted.');
+    }
+
+    if (!pngPages || pngPages.length === 0) {
+        throw new Error('No pages could be rendered from this PDF for OCR.');
+    }
+
+    const worker = await Tesseract.createWorker(lang);
+    try {
+        let fullText = '';
+        for (let i = 0; i < pngPages.length; i++) {
+            const { data } = await worker.recognize(pngPages[i].content);
+            fullText += `--- Page ${i + 1} ---\n${data.text.trim()}\n\n`;
+        }
+        return Buffer.from(fullText);
+    } catch (e) {
+        console.error('OCR recognition error:', e);
+        throw new Error('OCR recognition failed. ' + e.message);
+    } finally {
+        await worker.terminate();
+    }
 };
 
 exports.translatePdf = async (filePath, sourceLang, targetLang) => {
@@ -306,10 +341,14 @@ exports.powerpointToPdf = async (filePath) => {
     }
 };
 
-exports.pdfToJpg = async (filePath) => {
+exports.pdfToJpg = async (filePath, format = 'jpg') => {
     const tempDir = os.tmpdir();
     const baseName = uuidv4();
     const outputPrefix = path.join(tempDir, `${baseName}-page-%03d.jpg`);
+
+    const targetFormat = ['png', 'webp', 'jpg'].includes(String(format).replace('.', '').toLowerCase())
+        ? String(format).replace('.', '').toLowerCase()
+        : 'jpg';
 
     try {
         const gs = getGsCommand();
@@ -324,11 +363,18 @@ exports.pdfToJpg = async (filePath) => {
             throw new Error("No images generated");
         }
 
+        const sharp = require('sharp');
+        const convertBuffer = async (jpgBuffer) => {
+            if (targetFormat === 'png') return sharp(jpgBuffer).png().toBuffer();
+            if (targetFormat === 'webp') return sharp(jpgBuffer).webp({ quality: 85 }).toBuffer();
+            return jpgBuffer;
+        };
+
         if (generatedImages.length === 1) {
             const imgPath = path.join(tempDir, generatedImages[0]);
-            const imgBuffer = await fs.readFile(imgPath);
+            const imgBuffer = await convertBuffer(await fs.readFile(imgPath));
             try { await fs.unlink(imgPath); } catch (e) { }
-            return imgBuffer;
+            return { buffer: imgBuffer, format: targetFormat };
         }
 
         // Multiple pages -> zip them
@@ -337,16 +383,16 @@ exports.pdfToJpg = async (filePath) => {
 
         for (let i = 0; i < generatedImages.length; i++) {
             const imgPath = path.join(tempDir, generatedImages[i]);
-            const imgBuffer = await fs.readFile(imgPath);
-            zip.file(`page-${i + 1}.jpg`, imgBuffer);
+            const imgBuffer = await convertBuffer(await fs.readFile(imgPath));
+            zip.file(`page-${i + 1}.${targetFormat}`, imgBuffer);
             try { await fs.unlink(imgPath); } catch (e) { }
         }
 
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-        return zipBuffer;
+        return { buffer: zipBuffer, format: targetFormat };
     } catch (error) {
-        console.error('PDF to JPG error:', error);
-        throw new Error('Failed to convert PDF to JPG. ' + error.message);
+        console.error('PDF to image error:', error);
+        throw new Error('Failed to convert PDF to images. ' + error.message);
     }
 };
 
@@ -488,19 +534,57 @@ exports.protectPdf = async (filePath, password) => {
     }
 };
 
-exports.watermarkPdf = async (filePath, text) => {
+exports.watermarkPdf = async (filePath, text, options = {}) => {
     const fileContent = await fs.readFile(filePath);
     const pdfDoc = await PDFDocument.load(fileContent);
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const pages = pdfDoc.getPages();
+
+    const watermarkText = text || 'CONFIDENTIAL';
+    const position = options.position || 'diagonal'; // diagonal | center | top | bottom
+    const opacity = Math.min(1, Math.max(0.05, parseFloat(options.opacity) || 0.3));
+    let size = Math.min(200, Math.max(8, parseInt(options.fontSize) || 50));
 
     for (const page of pages) {
         const { width, height } = page.getSize();
-        page.drawText(text || 'CONFIDENTIAL', {
-            x: width / 4,
-            y: height / 2,
-            size: 50,
-            opacity: 0.3,
-            rotate: require('pdf-lib').degrees(45),
+
+        // Shrink font size so the text never overflows the page
+        let textWidth = font.widthOfTextAtSize(watermarkText, size);
+        const maxWidth = width * 0.8;
+        let effectiveSize = size;
+        if (textWidth > maxWidth) {
+            effectiveSize = Math.max(8, size * (maxWidth / textWidth));
+            textWidth = font.widthOfTextAtSize(watermarkText, effectiveSize);
+        }
+        const textHeight = font.heightAtSize(effectiveSize);
+
+        let x, y, rotate;
+        if (position === 'diagonal') {
+            const rad = Math.PI / 4;
+            x = width / 2 - (textWidth / 2) * Math.cos(rad);
+            y = height / 2 - (textWidth / 2) * Math.sin(rad);
+            rotate = degrees(45);
+        } else if (position === 'top') {
+            x = (width - textWidth) / 2;
+            y = height - textHeight - 30;
+            rotate = degrees(0);
+        } else if (position === 'bottom') {
+            x = (width - textWidth) / 2;
+            y = 30;
+            rotate = degrees(0);
+        } else { // center
+            x = (width - textWidth) / 2;
+            y = (height - textHeight) / 2;
+            rotate = degrees(0);
+        }
+
+        page.drawText(watermarkText, {
+            x, y,
+            size: effectiveSize,
+            font,
+            opacity,
+            rotate,
+            color: rgb(0.4, 0.4, 0.4),
         });
     }
 
@@ -508,53 +592,196 @@ exports.watermarkPdf = async (filePath, text) => {
     return Buffer.from(watermarkedBytes);
 };
 
-exports.signPdf = async (filePath, signatureText) => {
+exports.signPdf = async (filePath, signatureText, options = {}) => {
     const fileContent = await fs.readFile(filePath);
     const pdfDoc = await PDFDocument.load(fileContent);
-    const pages = pdfDoc.getPages();
-    const firstPage = pages[0];
 
-    firstPage.drawText(`Digitally Signed: ${signatureText || 'Verified User'}`, {
-        x: 50,
-        y: 50,
-        size: 15,
-    });
+    // Cursive web fonts aren't embeddable without font files; italic standard
+    // fonts are the closest match that keeps the PDF self-contained.
+    const FONT_MAP = {
+        'font-dancing': StandardFonts.HelveticaOblique,
+        'font-greatvibes': StandardFonts.TimesRomanItalic,
+        'font-alex': StandardFonts.TimesRomanItalic,
+        'font-caveat': StandardFonts.CourierOblique,
+    };
+    const sigFont = await pdfDoc.embedFont(FONT_MAP[options.font] || StandardFonts.HelveticaOblique);
+    const labelFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    const text = signatureText || 'Verified User';
+    const position = options.position || 'bottom-right'; // bottom-left | bottom-center | bottom-right
+    const sigSize = 22;
+    const labelSize = 8;
+
+    const pages = pdfDoc.getPages();
+    const page = options.allPages === 'true' ? null : pages[pages.length - 1];
+    const targets = page ? [page] : pages;
+
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    for (const target of targets) {
+        const { width } = target.getSize();
+        const sigWidth = sigFont.widthOfTextAtSize(text, sigSize);
+
+        let x;
+        if (position === 'bottom-left') x = 40;
+        else if (position === 'bottom-center') x = (width - sigWidth) / 2;
+        else x = width - sigWidth - 40;
+
+        target.drawText(text, { x, y: 60, size: sigSize, font: sigFont, color: rgb(0.1, 0.1, 0.35) });
+        target.drawText(`Digitally signed · ${dateStr}`, { x, y: 46, size: labelSize, font: labelFont, color: rgb(0.4, 0.4, 0.4) });
+    }
 
     const signedBytes = await pdfDoc.save();
     return Buffer.from(signedBytes);
 };
 
-exports.rotatePdf = async (filePath, degrees) => {
+exports.rotatePdf = async (filePath, rotationDegrees) => {
     const fileContent = await fs.readFile(filePath);
     const pdfDoc = await PDFDocument.load(fileContent);
     const pages = pdfDoc.getPages();
+    const delta = parseInt(rotationDegrees) || 90;
 
     for (const page of pages) {
-        page.setRotation(require('pdf-lib').degrees(parseInt(degrees) || 90));
+        // Add to the existing rotation instead of overwriting it, so pages
+        // that were already rotated (e.g. scanned landscape) stay correct.
+        const current = page.getRotation().angle;
+        page.setRotation(degrees(((current + delta) % 360 + 360) % 360));
     }
 
     const rotatedBytes = await pdfDoc.save();
     return Buffer.from(rotatedBytes);
 };
 
-exports.addPageNumbers = async (filePath) => {
+exports.addPageNumbers = async (filePath, options = {}) => {
     const fileContent = await fs.readFile(filePath);
     const pdfDoc = await PDFDocument.load(fileContent);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const pages = pdfDoc.getPages();
     const totalPages = pages.length;
 
+    const start = Math.max(1, parseInt(options.start) || 1);
+    const position = options.position || 'bottom-right'; // {top|bottom}-{left|center|right}
+    const format = options.format === 'simple' ? 'simple' : 'full'; // "3" vs "Page 3 of N"
+    const size = 10;
+    const margin = 20;
+
     for (let i = 0; i < totalPages; i++) {
         const page = pages[i];
-        const { width } = page.getSize();
-        page.drawText(`Page ${i + 1} of ${totalPages}`, {
-            x: width - 80,
-            y: 20,
-            size: 10,
-        });
+        const { width, height } = page.getSize();
+        const pageNum = start + i;
+        const label = format === 'simple' ? String(pageNum) : `Page ${pageNum} of ${start + totalPages - 1}`;
+        const textWidth = font.widthOfTextAtSize(label, size);
+
+        let x;
+        if (position.endsWith('left')) x = margin;
+        else if (position.endsWith('center')) x = (width - textWidth) / 2;
+        else x = width - textWidth - margin;
+
+        const y = position.startsWith('top') ? height - margin - size : margin;
+
+        page.drawText(label, { x, y, size, font, color: rgb(0.2, 0.2, 0.2) });
     }
 
     const numberedBytes = await pdfDoc.save();
     return Buffer.from(numberedBytes);
+};
+
+exports.cropPdf = async (filePath, margins = {}) => {
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const pages = pdfDoc.getPages();
+
+    const top = Math.max(0, parseFloat(margins.top) || 0);
+    const right = Math.max(0, parseFloat(margins.right) || 0);
+    const bottom = Math.max(0, parseFloat(margins.bottom) || 0);
+    const left = Math.max(0, parseFloat(margins.left) || 0);
+
+    if (top + right + bottom + left === 0) {
+        throw new Error('Please specify at least one crop margin greater than zero.');
+    }
+
+    for (const page of pages) {
+        const { x, y, width, height } = page.getMediaBox();
+        const newWidth = width - left - right;
+        const newHeight = height - top - bottom;
+        if (newWidth < 36 || newHeight < 36) {
+            throw new Error('Crop margins are too large — the remaining page area would be smaller than half an inch.');
+        }
+        page.setCropBox(x + left, y + bottom, newWidth, newHeight);
+    }
+
+    const croppedBytes = await pdfDoc.save();
+    return Buffer.from(croppedBytes);
+};
+
+const extractPdfText = async (filePath) => {
+    // pdf-parse first (no external binary); Ghostscript txtwrite as fallback
+    // for files its bundled pdf.js build can't read.
+    try {
+        const pdfParse = require('pdf-parse');
+        const data = await pdfParse(await fs.readFile(filePath));
+        return { text: data.text, pages: data.numpages };
+    } catch (parseErr) {
+        const tempOutputFile = path.join(os.tmpdir(), `${uuidv4()}-cmp.txt`);
+        try {
+            const gs = getGsCommand();
+            await execPromise(`${gs} -sDEVICE=txtwrite -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${tempOutputFile}" "${filePath}"`);
+            const text = await fs.readFile(tempOutputFile, 'utf-8');
+            return { text, pages: null };
+        } catch (gsErr) {
+            console.error('Compare text extraction failed:', parseErr.message, gsErr.message);
+            throw new Error('Failed to extract text for comparison. One of the PDFs may be scanned or encrypted — run OCR PDF first.');
+        } finally {
+            try { await fs.unlink(tempOutputFile); } catch (e) { }
+        }
+    }
+};
+
+exports.comparePdfs = async (filePathA, filePathB) => {
+    const [dataA, dataB] = await Promise.all([extractPdfText(filePathA), extractPdfText(filePathB)]);
+
+    const MAX_LINES = 5000;
+    const linesA = dataA.text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, MAX_LINES);
+    const linesB = dataB.text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, MAX_LINES);
+
+    // LCS-based line diff
+    const n = linesA.length, m = linesB.length;
+    const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) {
+        for (let j = m - 1; j >= 0; j--) {
+            dp[i][j] = linesA[i] === linesB[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        }
+    }
+
+    const diff = [];
+    let i = 0, j = 0, removed = 0, added = 0;
+    while (i < n && j < m) {
+        if (linesA[i] === linesB[j]) { diff.push(`  ${linesA[i]}`); i++; j++; }
+        else if (dp[i + 1][j] >= dp[i][j + 1]) { diff.push(`- ${linesA[i]}`); removed++; i++; }
+        else { diff.push(`+ ${linesB[j]}`); added++; j++; }
+    }
+    while (i < n) { diff.push(`- ${linesA[i++]}`); removed++; }
+    while (j < m) { diff.push(`+ ${linesB[j++]}`); added++; }
+
+    const identical = removed === 0 && added === 0;
+    const header = [
+        'PDF COMPARISON REPORT',
+        '=====================',
+        `Document A: ${dataA.pages != null ? dataA.pages + ' page(s), ' : ''}${linesA.length} text line(s)`,
+        `Document B: ${dataB.pages != null ? dataB.pages + ' page(s), ' : ''}${linesB.length} text line(s)`,
+        '',
+        identical
+            ? 'RESULT: The documents have identical text content.'
+            : `RESULT: ${removed} line(s) removed, ${added} line(s) added.`,
+        '',
+        'Legend: lines starting with "-" exist only in Document A,',
+        '        lines starting with "+" exist only in Document B.',
+        '---------------------------------------------------------',
+        '',
+    ].join('\n');
+
+    // Identical documents: skip the body, the header says it all
+    return Buffer.from(header + (identical ? '' : diff.join('\n')));
 };
 
 exports.excelToPdf = async (filePath) => {
