@@ -813,7 +813,40 @@ exports.excelToPdf = async (filePath) => {
     }
 };
 
-exports.htmlToPdf = async (url) => {
+// Serialize conversions: two concurrent Chromium instances OOM-kill the
+// 512MB host, which surfaces to users as a 502 mid-request.
+let htmlToPdfQueue = Promise.resolve();
+
+const assertSafeUrl = (url) => {
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch (e) {
+        throw new Error('Please provide a valid URL, e.g. https://example.com');
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('Only http:// and https:// URLs are supported.');
+    }
+    const host = parsed.hostname.toLowerCase();
+    const privatePatterns = [
+        /^localhost$/, /^127\./, /^0\.0\.0\.0$/, /^10\./, /^192\.168\./,
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./, /^169\.254\./, /^\[?::1\]?$/, /\.internal$/,
+    ];
+    if (privatePatterns.some(p => p.test(host))) {
+        throw new Error('This URL points to a private or internal address and cannot be converted.');
+    }
+    return parsed.href;
+};
+
+exports.htmlToPdf = (url) => {
+    const run = htmlToPdfQueue.then(() => htmlToPdfInner(url));
+    // Keep the queue alive even when a conversion fails
+    htmlToPdfQueue = run.catch(() => { });
+    return run;
+};
+
+const htmlToPdfInner = async (url) => {
+    const safeUrl = assertSafeUrl(url);
     const puppeteer = require('puppeteer');
     const launchOptions = {
         headless: true,
@@ -825,6 +858,7 @@ exports.htmlToPdf = async (url) => {
             '--no-first-run',
             '--no-zygote',
             '--single-process',
+            '--js-flags=--max-old-space-size=256',
         ],
     };
     if (process.env.PUPPETEER_EXECUTABLE_PATH) {
@@ -833,9 +867,32 @@ exports.htmlToPdf = async (url) => {
     const browser = await puppeteer.launch(launchOptions);
     try {
         const page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-        const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+        await page.setViewport({ width: 1280, height: 900 });
+
+        // Media streams and websockets on heavy pages balloon memory and can
+        // OOM-kill the whole process; the print layout doesn't need them.
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            if (['media', 'websocket', 'eventsource'].includes(req.resourceType())) req.abort();
+            else req.continue();
+        });
+
+        // networkidle0 never settles on pages with analytics/ad beacons and
+        // burns the whole timeout; DOM + a short settle is enough for print.
+        await page.goto(safeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.evaluate(() => new Promise(r => setTimeout(r, 2500)));
+
+        const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, timeout: 60000 });
         return Buffer.from(pdfBuffer);
+    } catch (e) {
+        console.error('HTML to PDF error:', e.message);
+        if (e.message && (e.message.includes('net::ERR_NAME_NOT_RESOLVED') || e.message.includes('net::ERR_CONNECTION'))) {
+            throw new Error('Could not reach that URL. Please check the address and try again.');
+        }
+        if (e.message && e.message.includes('timeout')) {
+            throw new Error('The page took too long to load. Try a simpler page or try again later.');
+        }
+        throw e;
     } finally {
         await browser.close();
     }
