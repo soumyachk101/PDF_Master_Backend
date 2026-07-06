@@ -154,6 +154,20 @@ function cleanupTempFiles() {
 cron.schedule('*/10 * * * *', cleanupTempFiles)
 cleanupTempFiles()
 
+// ─── Keep-alive self-ping ─────────────────────────────────────────────────────
+// Render's free tier spins the instance down after ~15 min without inbound
+// traffic; the next request then 502s at the proxy while the service cold-boots.
+// RENDER_EXTERNAL_URL is set automatically by Render.
+const selfPingUrl = process.env.RENDER_EXTERNAL_URL || process.env.SELF_PING_URL
+if (selfPingUrl) {
+  const axios = require('axios')
+  cron.schedule('*/10 * * * *', () => {
+    axios.get(`${selfPingUrl}/api/pdf/health`, { timeout: 30000 })
+      .catch(err => console.error('[keepalive] Ping failed:', err.message))
+  })
+  console.log(`[keepalive] Self-ping enabled every 10 min → ${selfPingUrl}/api/pdf/health`)
+}
+
 // ─── Set Puppeteer executable path for Railway (chromium from nix) ───────────
 if (!process.env.PUPPETEER_EXECUTABLE_PATH && process.env.RAILWAY) {
   // Railway/Nixpacks puts chromium here when nixPkg 'chromium' is installed
