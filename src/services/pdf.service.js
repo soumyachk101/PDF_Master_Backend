@@ -97,30 +97,35 @@ exports.splitPdf = async (filePath, ranges) => {
     return zipBuffer;
 };
 
+// Shared by extractPdf and removePages so both tools accept identical
+// "1-3, 5, 7-10" input syntax. Returns sorted, deduped, 0-indexed pages.
+const parsePageRanges = (rangeString, totalPages) => {
+    const indices = [];
+    if (rangeString && typeof rangeString === 'string' && rangeString.trim()) {
+        const parts = rangeString.split(',');
+        for (const part of parts) {
+            if (part.includes('-')) {
+                const [start, end] = part.split('-').map(Number);
+                for (let i = start; i <= end; i++) {
+                    if (i > 0 && i <= totalPages) indices.push(i - 1);
+                }
+            } else {
+                const i = Number(part);
+                if (i > 0 && i <= totalPages) indices.push(i - 1);
+            }
+        }
+    }
+    return [...new Set(indices)].sort((a, b) => a - b);
+};
+
 exports.extractPdf = async (filePath, ranges) => {
     const fileContent = await fs.readFile(filePath);
     const pdfDoc = await PDFDocument.load(fileContent);
     const totalPages = pdfDoc.getPageCount();
     const newPdf = await PDFDocument.create();
 
-    let indicesToCopy = [];
-    if (ranges && typeof ranges === 'string' && ranges.trim()) {
-        const parts = ranges.split(',');
-        for (const part of parts) {
-            if (part.includes('-')) {
-                const [start, end] = part.split('-').map(Number);
-                for (let i = start; i <= end; i++) {
-                    if (i > 0 && i <= totalPages) indicesToCopy.push(i - 1);
-                }
-            } else {
-                const i = Number(part);
-                if (i > 0 && i <= totalPages) indicesToCopy.push(i - 1);
-            }
-        }
-    }
-
+    let indicesToCopy = parsePageRanges(ranges, totalPages);
     if (indicesToCopy.length === 0) indicesToCopy = [0];
-    indicesToCopy = [...new Set(indicesToCopy)].sort((a, b) => a - b);
 
     const copiedPages = await newPdf.copyPages(pdfDoc, indicesToCopy);
     copiedPages.forEach((page) => newPdf.addPage(page));
@@ -946,19 +951,241 @@ exports.removePages = async (filePath, pagesToRemoveString) => {
     const pdfDoc = await PDFDocument.load(fileContent);
     const totalPages = pdfDoc.getPageCount();
 
-    let toRemove = [];
-    if (pagesToRemoveString && typeof pagesToRemoveString === 'string') {
-        toRemove = pagesToRemoveString.split(',').map(Number).filter(n => !isNaN(n)).map(n => n - 1);
-    }
-
-    toRemove = [...new Set(toRemove)].sort((a, b) => b - a);
+    // Descending order so removing one page never shifts the index of the next one to remove.
+    const toRemove = parsePageRanges(pagesToRemoveString, totalPages).sort((a, b) => b - a);
 
     for (const index of toRemove) {
-        if (index >= 0 && index < totalPages) {
-            pdfDoc.removePage(index);
-        }
+        pdfDoc.removePage(index);
     }
 
     const modifiedBytes = await pdfDoc.save();
     return Buffer.from(modifiedBytes);
+};
+
+// ─── Phase 5: real tool engines ──────────────────────────────────────────────
+
+const MAX_THUMBNAIL_PAGES = 200; // ponytail: page-picker cap, raise if a real user hits it
+
+exports.getThumbnails = async (filePath) => {
+    const { pdfToPng } = require('pdf-to-png-converter');
+    const fileContent = await fs.readFile(filePath);
+
+    let pdfDoc;
+    try {
+        pdfDoc = await PDFDocument.load(fileContent, { ignoreEncryption: true });
+    } catch (e) {
+        const err = new Error('This PDF could not be read. It may be corrupted or encrypted.');
+        err.status = 400;
+        throw err;
+    }
+
+    const pageCount = pdfDoc.getPageCount();
+    if (pageCount === 0) {
+        const err = new Error('This PDF has no pages.');
+        err.status = 400;
+        throw err;
+    }
+
+    const pagesToRender = Math.min(pageCount, MAX_THUMBNAIL_PAGES);
+
+    let pngPages;
+    try {
+        pngPages = await pdfToPng(fileContent, {
+            viewportScale: 0.5,
+            pagesToProcess: Array.from({ length: pagesToRender }, (_, i) => i + 1),
+            strictPagesToProcess: false,
+        });
+    } catch (e) {
+        console.error('Thumbnail render error:', e);
+        const err = new Error('Failed to render PDF pages. The file may be corrupted or encrypted.');
+        err.status = 400;
+        throw err;
+    }
+
+    if (!pngPages || pngPages.length === 0) {
+        const err = new Error('No pages could be rendered from this PDF.');
+        err.status = 400;
+        throw err;
+    }
+
+    const pages = pngPages.map((png, i) => {
+        const { width, height } = pdfDoc.getPage(i).getSize();
+        return {
+            index: i + 1,
+            width,
+            height,
+            thumbnail: `data:image/png;base64,${png.content.toString('base64')}`,
+        };
+    });
+
+    return { pageCount, pages };
+};
+
+exports.organizePdf = async (filePath, order) => {
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const totalPages = pdfDoc.getPageCount();
+
+    let indices = [];
+    if (order && typeof order === 'string' && order.trim()) {
+        // Verbatim order, not sorted/deduped — sequence is the whole point of this tool.
+        indices = order.split(',')
+            .map(Number)
+            .filter((n) => Number.isInteger(n) && n >= 1 && n <= totalPages)
+            .map((n) => n - 1);
+    }
+
+    if (indices.length === 0) {
+        const err = new Error('Please provide a valid page order to reorganize.');
+        err.status = 400;
+        throw err;
+    }
+
+    const newPdf = await PDFDocument.create();
+    const copiedPages = await newPdf.copyPages(pdfDoc, indices);
+    copiedPages.forEach((page) => newPdf.addPage(page));
+    const newPdfBytes = await newPdf.save();
+    return Buffer.from(newPdfBytes);
+};
+
+exports.redactPdf = async (filePath, regions) => {
+    if (!Array.isArray(regions) || regions.length === 0) {
+        const err = new Error('Please mark at least one region to redact.');
+        err.status = 400;
+        throw err;
+    }
+
+    const tempId = uuidv4();
+    const outputPath = path.join(os.tmpdir(), `${tempId}-redacted.pdf`);
+    const regionsPath = path.join(os.tmpdir(), `${tempId}-regions.json`);
+    const scriptPath = path.join(os.tmpdir(), `${tempId}-redact.py`);
+
+    // PyMuPDF page coordinates are top-left origin, y-down — empirically verified
+    // against the installed version (1.28.0), NOT assumed. This is the opposite of
+    // every pdf-lib call in this file (bottom-left, y-up). Do not apply the same
+    // Y-flip math used for edit-pdf's annotations to these regions.
+    const pythonScriptContent = `
+import sys
+import json
+import fitz
+
+def redact_pdf(pdf_path, regions_path, output_path):
+    doc = fitz.open(pdf_path)
+    with open(regions_path, 'r') as f:
+        regions = json.load(f)
+
+    touched_pages = set()
+    for region in regions:
+        page_index = int(region['page']) - 1
+        if page_index < 0 or page_index >= len(doc):
+            continue
+        page = doc[page_index]
+        rect = fitz.Rect(
+            float(region['x']),
+            float(region['y']),
+            float(region['x']) + float(region['width']),
+            float(region['y']) + float(region['height']),
+        )
+        page.add_redact_annot(rect, fill=(0, 0, 0))
+        touched_pages.add(page_index)
+
+    for page_index in touched_pages:
+        doc[page_index].apply_redactions()
+
+    doc.save(output_path)
+    doc.close()
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python script.py <input.pdf> <regions.json> <output.pdf>")
+        sys.exit(1)
+    redact_pdf(sys.argv[1], sys.argv[2], sys.argv[3])
+`;
+
+    try {
+        await fs.writeFile(scriptPath, pythonScriptContent);
+        await fs.writeFile(regionsPath, JSON.stringify(regions));
+
+        const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
+        // Regions passed as a file path, not inline in the command string, to avoid
+        // shell quoting/escaping issues with exec() — same reasoning as pdfToWord.
+        const command = `${pythonCmd} "${scriptPath}" "${filePath}" "${regionsPath}" "${outputPath}"`;
+
+        const envOptions = {
+            env: {
+                ...process.env,
+                PYTHONPATH: [
+                    path.join(process.cwd(), '.python_deps'),
+                    process.env.PYTHONPATH,
+                ].filter(Boolean).join(path.delimiter),
+            },
+        };
+
+        await execPromise(command, envOptions);
+
+        const redactedBuffer = await fs.readFile(outputPath);
+        return Buffer.from(redactedBuffer);
+    } catch (e) {
+        console.error('Redact PDF (PyMuPDF) error:', e);
+        throw new Error('Failed to redact PDF. ' + e.message);
+    } finally {
+        try { await fs.unlink(outputPath); } catch (e) { }
+        try { await fs.unlink(regionsPath); } catch (e) { }
+        try { await fs.unlink(scriptPath); } catch (e) { }
+    }
+};
+
+// '#rrggbb' -> pdf-lib rgb(); falls back to black for anything else (missing,
+// malformed, named colors) rather than throwing over a cosmetic field.
+const parseHexColor = (hex) => {
+    const match = typeof hex === 'string' && hex.match(/^#?([0-9a-fA-F]{6})$/);
+    if (!match) return rgb(0, 0, 0);
+    const n = parseInt(match[1], 16);
+    return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+};
+
+exports.editPdf = async (filePath, annotations) => {
+    if (!Array.isArray(annotations) || annotations.length === 0) {
+        const err = new Error('Please add at least one text box or pen stroke.');
+        err.status = 400;
+        throw err;
+    }
+
+    const fileContent = await fs.readFile(filePath);
+    const pdfDoc = await PDFDocument.load(fileContent);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
+
+    for (const annotation of annotations) {
+        const pageIndex = Number(annotation.page) - 1;
+        if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= totalPages) continue;
+        const page = pages[pageIndex];
+
+        if (annotation.type === 'text' && annotation.text) {
+            page.drawText(String(annotation.text), {
+                x: Number(annotation.x) || 0,
+                y: Number(annotation.y) || 0,
+                size: Number(annotation.size) || 14,
+                font,
+                color: parseHexColor(annotation.color),
+            });
+        } else if (annotation.type === 'draw' && Array.isArray(annotation.points) && annotation.points.length > 1) {
+            const color = parseHexColor(annotation.color);
+            const thickness = Number(annotation.width) || 2;
+            for (let i = 1; i < annotation.points.length; i++) {
+                const prev = annotation.points[i - 1];
+                const cur = annotation.points[i];
+                page.drawLine({
+                    start: { x: Number(prev.x) || 0, y: Number(prev.y) || 0 },
+                    end: { x: Number(cur.x) || 0, y: Number(cur.y) || 0 },
+                    thickness,
+                    color,
+                });
+            }
+        }
+    }
+
+    const editedBytes = await pdfDoc.save();
+    return Buffer.from(editedBytes);
 };

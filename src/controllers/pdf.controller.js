@@ -326,6 +326,79 @@ exports.removePages = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
+// --- PHASE 5: PAGE-PICKER-BACKED TOOLS ---
+
+exports.getThumbnails = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const result = await pdfService.getThumbnails(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.json(result);
+    } catch (error) {
+        try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
+        if (error.status) return res.status(error.status).json({ error: { message: error.message } });
+        next(error);
+    }
+};
+
+exports.organizePdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        const { order } = req.body; // e.g., '3,1,2' — desired final sequence, 1-indexed
+        const pdfBuffer = await pdfService.organizePdf(req.file.path, order);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="organized.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) {
+        try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
+        if (error.status) return res.status(error.status).json({ error: { message: error.message } });
+        next(error);
+    }
+};
+
+exports.redactPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        let regions;
+        try {
+            regions = JSON.parse(req.body.regions || '[]');
+        } catch (e) {
+            return res.status(400).json({ error: { message: 'Invalid regions data.' } });
+        }
+        const pdfBuffer = await pdfService.redactPdf(req.file.path, regions);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="redacted.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) {
+        try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
+        if (error.status) return res.status(error.status).json({ error: { message: error.message } });
+        next(error);
+    }
+};
+
+exports.editPdf = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
+        let annotations;
+        try {
+            annotations = JSON.parse(req.body.annotations || '[]');
+        } catch (e) {
+            return res.status(400).json({ error: { message: 'Invalid annotations data.' } });
+        }
+        const pdfBuffer = await pdfService.editPdf(req.file.path, annotations);
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="edited.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) {
+        try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
+        if (error.status) return res.status(error.status).json({ error: { message: error.message } });
+        next(error);
+    }
+};
+
 // --- ORGANIZE (MISC) ---
 
 exports.rotatePdf = async (req, res, next) => {

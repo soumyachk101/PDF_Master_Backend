@@ -18,8 +18,11 @@ router.post('/merge-pdf', upload.array('files', 20), pdfController.mergePdf);
 router.post('/split-pdf', upload.single('files'), pdfController.splitPdf);
 router.post('/remove-pages', upload.single('files'), pdfController.removePages);
 router.post('/extract-pages', upload.single('files'), pdfController.extractPdf);
-router.post('/organize-pdf', upload.single('files'), pdfController.rotatePdf); // MVP: Basic rotate functionality
+router.post('/organize-pdf', upload.single('files'), pdfController.organizePdf);
 router.post('/scan-to-pdf', upload.array('files', 50), pdfController.jpgToPdf);
+
+// ─── PAGE-PICKER-BACKED TOOLS ────────────────────────────────────────────────
+router.post('/thumbnails', upload.single('files'), pdfController.getThumbnails);
 
 // ─── OPTIMIZE ────────────────────────────────────────────────────────────────
 router.post('/compress-pdf', upload.single('files'), pdfController.compressPdf);
@@ -54,14 +57,14 @@ router.post('/rotate-pdf', upload.single('files'), pdfController.rotatePdf);
 router.post('/page-numbers', upload.single('files'), pdfController.addPageNumbers);
 router.post('/add-watermark', upload.single('files'), pdfController.watermarkPdf);
 router.post('/crop-pdf', upload.single('files'), pdfController.cropPdf);
-router.post('/edit-pdf', upload.single('files'), pdfController.watermarkPdf); // MVP: Use watermark as placeholder
+router.post('/edit-pdf', upload.single('files'), pdfController.editPdf);
 
 // ─── SECURITY ────────────────────────────────────────────────────────────────
 router.post('/unlock-pdf', upload.single('files'), pdfController.unlockPdf);
 router.post('/protect-pdf', upload.single('files'), pdfController.protectPdf);
 router.post('/lock-pdf', upload.single('files'), pdfController.protectPdf); // Alias
 router.post('/sign-pdf', upload.single('files'), pdfController.signPdf);
-router.post('/redact-pdf', upload.single('files'), pdfController.protectPdf); // MVP: Use protect as placeholder
+router.post('/redact-pdf', upload.single('files'), pdfController.redactPdf);
 router.post('/compare-pdf', upload.array('files', 2), pdfController.comparePdf);
 
 // ─── INTELLIGENCE ────────────────────────────────────────────────────────────
