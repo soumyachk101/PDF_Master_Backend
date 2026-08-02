@@ -63,19 +63,38 @@ app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
 // ─── Rate limiting ───────────────────────────────────────────────────────────
-const limiter= rateLimit({
+const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please try again later.' },
-  skip: (req) => process.env.NODE_ENV === 'development',
+  skip: (req) => process.env.NODE_ENV === 'development' || req.path.includes('/health') || req.path.includes('/status'),
 })
 app.use('/api/', limiter)
 
 // ─── Health check & Root ───────────────────────────────────────────────────────
+const getHealthStatus = (scope = 'global') => {
+  const memory = process.memoryUsage()
+  return {
+    status: 'ok',
+    message: 'Backend server is healthy and operational',
+    scope,
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    uptimeFormatted: `${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s`,
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+    memory: {
+      rss: `${Math.round(memory.rss / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(memory.heapTotal / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
+    }
+  }
+}
+
 app.get('/', (req, res) => {
- res.json({
+  res.json({
     message: 'Welcome to the PDFKit API',
     status: 'running',
     docs: process.env.FRONTEND_URL || 'https://www.pdfkit.fun'
@@ -83,31 +102,20 @@ app.get('/', (req, res) => {
 })
 
 app.get('/health', (req, res) => {
- res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-  })
+  res.json(getHealthStatus('root'))
 })
 
 // Common aliases (useful for uptime monitors / reverse proxies)
 app.get('/status', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-  })
+  res.json(getHealthStatus('root'))
 })
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-  })
+  res.json(getHealthStatus('api'))
+})
+
+app.get('/api/status', (req, res) => {
+  res.json(getHealthStatus('api'))
 })
 
 // ─── Routes ──────────────────────────────────────────────────────────────────

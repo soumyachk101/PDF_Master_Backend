@@ -5,11 +5,21 @@ const pdfController = require('../controllers/pdf.controller');
 
 // Health check for API proxying (useful for /api/pdf/health checks)
 router.get('/health', (req, res) => {
+  const memory = process.memoryUsage();
   res.json({
     status: 'ok',
+    message: 'PDF service is healthy and operational',
     scope: 'pdf',
-    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    uptimeFormatted: `${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s`,
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+    memory: {
+      rss: `${Math.round(memory.rss / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(memory.heapTotal / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
+    }
   });
 });
 
