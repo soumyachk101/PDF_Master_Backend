@@ -2,6 +2,29 @@ const pdfService = require('../services/pdf.service');
 const path = require('path');
 const fs = require('fs');
 
+const getOutputFilename = (req, defaultFallback, newExt = null) => {
+    let originalName = null;
+    if (req.file && req.file.originalname) {
+        originalName = req.file.originalname;
+    } else if (req.files && req.files.length > 0 && req.files[0].originalname) {
+        originalName = req.files[0].originalname;
+    }
+
+    if (!originalName) {
+        return defaultFallback;
+    }
+
+    const cleanOriginal = originalName.replace(/"/g, '');
+
+    if (newExt) {
+        const extWithDot = newExt.startsWith('.') ? newExt : `.${newExt}`;
+        const baseName = path.parse(cleanOriginal).name;
+        return `${baseName}${extWithDot}`;
+    }
+
+    return cleanOriginal;
+};
+
 exports.mergePdf = async (req, res, next) => {
     try {
         if (!req.files || req.files.length < 2) {
@@ -20,8 +43,9 @@ exports.mergePdf = async (req, res, next) => {
         res.once('finish', cleanup);
         res.once('close', cleanup);
 
+        const outFilename = getOutputFilename(req, 'merged-result.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="merged-result.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(mergedBuffer);
 
     } catch (error) {
@@ -40,8 +64,9 @@ exports.splitPdf = async (req, res, next) => {
 
         fs.unlinkSync(req.file.path);
 
+        const outFilename = getOutputFilename(req, 'split-result.zip', '.zip');
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', 'attachment; filename="split-result.zip"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(splitBuffer);
     } catch (error) {
         next(error);
@@ -59,14 +84,14 @@ exports.extractPdf = async (req, res, next) => {
 
         fs.unlinkSync(req.file.path);
 
+        const outFilename = getOutputFilename(req, 'extracted-result.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="extracted-result.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(extractBuffer);
     } catch (error) {
         next(error);
     }
 };
-
 
 exports.compressPdf = async (req, res, next) => {
     try {
@@ -78,8 +103,9 @@ exports.compressPdf = async (req, res, next) => {
 
         fs.unlinkSync(req.file.path);
 
+        const outFilename = getOutputFilename(req, 'compressed-result.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="compressed-result.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(compressedBuffer);
     } catch (error) {
         next(error);
@@ -91,8 +117,9 @@ exports.repairPdf = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF file to repair.' } });
         const repairedBuffer = await pdfService.repairPdf(req.file.path);
         fs.unlinkSync(req.file.path);
+        const outFilename = getOutputFilename(req, 'repaired-result.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="repaired-result.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(repairedBuffer);
     } catch (error) { next(error); }
 };
@@ -102,8 +129,9 @@ exports.flattenPdf = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF file to flatten.' } });
         const flatBuffer = await pdfService.flattenPdf(req.file.path);
         fs.unlinkSync(req.file.path);
+        const outFilename = getOutputFilename(req, 'flattened-result.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="flattened-result.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(flatBuffer);
     } catch (error) { next(error); }
 };
@@ -114,8 +142,9 @@ exports.ocrPdf = async (req, res, next) => {
         const lang = req.body.lang || 'eng';
         const textBuffer = await pdfService.ocrPdf(req.file.path, lang);
         fs.unlinkSync(req.file.path);
+        const outFilename = getOutputFilename(req, 'ocr-result.txt', '.txt');
         res.setHeader('Content-Type', 'text/plain');
-        res.setHeader('Content-Disposition', 'attachment; filename="ocr-result.txt"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(textBuffer);
     } catch (error) { next(error); }
 };
@@ -127,8 +156,9 @@ exports.translatePdf = async (req, res, next) => {
         const targetLang = req.body.targetLang || 'hi';
         const translatedBuffer = await pdfService.translatePdf(req.file.path, sourceLang, targetLang);
         fs.unlinkSync(req.file.path);
+        const outFilename = getOutputFilename(req, 'translated-result.txt', '.txt');
         res.setHeader('Content-Type', 'text/plain');
-        res.setHeader('Content-Disposition', 'attachment; filename="translated-result.txt"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(translatedBuffer);
     } catch (error) { next(error); }
 };
@@ -143,8 +173,9 @@ exports.jpgToPdf = async (req, res, next) => {
         filePaths.forEach(fp => {
             try { fs.unlinkSync(fp); } catch (e) { }
         });
+        const outFilename = getOutputFilename(req, 'converted-images.pdf', '.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-images.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -154,8 +185,9 @@ exports.wordToPdf = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a Word Document.' } });
         const pdfBuffer = await pdfService.wordToPdf(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'converted-word.pdf', '.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-word.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -165,8 +197,9 @@ exports.powerpointToPdf = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PowerPoint Document.' } });
         const pdfBuffer = await pdfService.powerpointToPdf(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'converted-presentation.pdf', '.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-presentation.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -181,14 +214,17 @@ exports.pdfToJpg = async (req, res, next) => {
 
         // If it's a zip (multiple pages), it has a magic number signature 'PK' (50 4B)
         const isZip = resultBuffer[0] === 0x50 && resultBuffer[1] === 0x4B;
+        const ext = isZip ? '.zip' : `.${format}`;
+        const defaultName = isZip ? 'converted-images.zip' : `converted-image.${format}`;
+        const outFilename = getOutputFilename(req, defaultName, ext);
 
         if (isZip) {
             res.setHeader('Content-Type', 'application/zip');
-            res.setHeader('Content-Disposition', 'attachment; filename="converted-images.zip"');
+            res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         } else {
             const mimeByFormat = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
             res.setHeader('Content-Type', mimeByFormat[format] || 'image/jpeg');
-            res.setHeader('Content-Disposition', `attachment; filename="converted-image.${format}"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         }
         res.send(resultBuffer);
     } catch (error) { next(error); }
@@ -199,8 +235,9 @@ exports.pdfToWord = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
         const docxBuffer = await pdfService.pdfToWord(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'converted-word.docx', '.docx');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-word.docx"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(docxBuffer);
     } catch (error) { next(error); }
 };
@@ -210,8 +247,9 @@ exports.pdfToExcel = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
         const csvBuffer = await pdfService.pdfToExcel(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'converted-excel.csv', '.csv');
         res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-excel.csv"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(csvBuffer);
     } catch (error) { next(error); }
 };
@@ -224,8 +262,9 @@ exports.unlockPdf = async (req, res, next) => {
         const { password } = req.body;
         const pdfBuffer = await pdfService.unlockPdf(req.file.path, password);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'unlocked.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="unlocked.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -238,8 +277,9 @@ exports.protectPdf = async (req, res, next) => {
 
         const pdfBuffer = await pdfService.protectPdf(req.file.path, password);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'protected.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="protected.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -250,8 +290,9 @@ exports.watermarkPdf = async (req, res, next) => {
         const { text, position, opacity, fontSize } = req.body;
         const pdfBuffer = await pdfService.watermarkPdf(req.file.path, text, { position, opacity, fontSize });
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'watermarked.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="watermarked.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -262,8 +303,9 @@ exports.signPdf = async (req, res, next) => {
         const { text, font, position, allPages } = req.body;
         const pdfBuffer = await pdfService.signPdf(req.file.path, text, { font, position, allPages });
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'signed.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="signed.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -275,8 +317,9 @@ exports.excelToPdf = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload an Excel file.' } });
         const pdfBuffer = await pdfService.excelToPdf(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'converted-excel.pdf', '.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted-excel.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -297,8 +340,9 @@ exports.pdfToPptx = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
         const pptxBuffer = await pdfService.pdfToPptx(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'converted.pptx', '.pptx');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-        res.setHeader('Content-Disposition', 'attachment; filename="converted.pptx"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pptxBuffer);
     } catch (error) { next(error); }
 };
@@ -308,8 +352,9 @@ exports.pdfToPdfa = async (req, res, next) => {
         if (!req.file) return res.status(400).json({ error: { message: 'Please upload a PDF Document.' } });
         const pdfaBuffer = await pdfService.pdfToPdfa(req.file.path);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'archive.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="archive.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfaBuffer);
     } catch (error) { next(error); }
 };
@@ -320,8 +365,9 @@ exports.removePages = async (req, res, next) => {
         const { pages } = req.body; // e.g., '1,3,5'
         const pdfBuffer = await pdfService.removePages(req.file.path, pages);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'pages-removed.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="pages-removed.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -347,8 +393,9 @@ exports.organizePdf = async (req, res, next) => {
         const { order } = req.body; // e.g., '3,1,2' — desired final sequence, 1-indexed
         const pdfBuffer = await pdfService.organizePdf(req.file.path, order);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'organized.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="organized.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) {
         try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
@@ -368,8 +415,9 @@ exports.redactPdf = async (req, res, next) => {
         }
         const pdfBuffer = await pdfService.redactPdf(req.file.path, regions);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'redacted.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="redacted.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) {
         try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
@@ -389,8 +437,9 @@ exports.editPdf = async (req, res, next) => {
         }
         const pdfBuffer = await pdfService.editPdf(req.file.path, annotations);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'edited.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="edited.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) {
         try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) { }
@@ -407,8 +456,9 @@ exports.rotatePdf = async (req, res, next) => {
         const { degrees } = req.body;
         const pdfBuffer = await pdfService.rotatePdf(req.file.path, degrees);
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'rotated.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="rotated.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -419,8 +469,9 @@ exports.addPageNumbers = async (req, res, next) => {
         const { start, position, format } = req.body;
         const pdfBuffer = await pdfService.addPageNumbers(req.file.path, { start, position, format });
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'numbered.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="numbered.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -431,8 +482,9 @@ exports.cropPdf = async (req, res, next) => {
         const { top, right, bottom, left } = req.body;
         const pdfBuffer = await pdfService.cropPdf(req.file.path, { top, right, bottom, left });
         try { fs.unlinkSync(req.file.path); } catch (e) { }
+        const outFilename = getOutputFilename(req, 'cropped.pdf');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename="cropped.pdf"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(pdfBuffer);
     } catch (error) { next(error); }
 };
@@ -445,8 +497,16 @@ exports.comparePdf = async (req, res, next) => {
         const [fileA, fileB] = req.files;
         const reportBuffer = await pdfService.comparePdfs(fileA.path, fileB.path);
         req.files.forEach(f => { try { fs.unlinkSync(f.path); } catch (e) { } });
+        let outFilename = 'comparison-report.txt';
+        if (req.files && req.files.length >= 2) {
+            const nameA = path.parse(req.files[0].originalname).name;
+            const nameB = path.parse(req.files[1].originalname).name;
+            outFilename = `${nameA}_vs_${nameB}_comparison.txt`.replace(/"/g, '');
+        } else if (req.files && req.files.length === 1) {
+            outFilename = getOutputFilename(req, 'comparison-report.txt', '.txt');
+        }
         res.setHeader('Content-Type', 'text/plain');
-        res.setHeader('Content-Disposition', 'attachment; filename="comparison-report.txt"');
+        res.setHeader('Content-Disposition', `attachment; filename="${outFilename}"`);
         res.send(reportBuffer);
     } catch (error) { next(error); }
 };
