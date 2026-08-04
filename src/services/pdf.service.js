@@ -142,8 +142,16 @@ exports.compressPdf = async (filePath) => {
         const compressedBuffer = await fs.readFile(tempOutputFile);
         return Buffer.from(compressedBuffer);
     } catch (error) {
-        console.error('Compression error:', error);
-        throw new Error('Failed to compress PDF. Internal Error.');
+        console.error('Ghostscript compression failed, attempting pdf-lib fallback:', error);
+        try {
+            const fileContent = await fs.readFile(filePath);
+            const pdfDoc = await PDFDocument.load(fileContent, { ignoreEncryption: true });
+            const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
+            return Buffer.from(compressedBytes);
+        } catch (fallbackErr) {
+            console.error('PDF compression fallback failed:', fallbackErr);
+            throw new Error('Failed to compress PDF. File may be corrupted or invalid.');
+        }
     } finally {
         try { await fs.unlink(tempOutputFile); } catch (e) { }
     }
